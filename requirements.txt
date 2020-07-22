@@ -1,0 +1,6 @@
+amply==0.1.2
+docutils==0.16
+prettytable==0.7.2
+PTable==0.9.2
+PuLP==2.2
+pyparsing==2.4.7
