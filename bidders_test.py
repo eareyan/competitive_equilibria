@@ -105,3 +105,11 @@ class MyTestCase(unittest.TestCase):
         welfare_brute_force, allocation_brute_force = sm_market.brute_force_welfare_max_solver()
         print(MarketInspector.pretty_print_allocation(allocation_brute_force))
         self.assertEqual(welfare_brute_force, 10.0)
+
+    def test_generate_all_sm_markets(self):
+        all_sm_markets = bidders.SingleMinded.generate_all_sm_markets(num_goods=3,
+                                                                      num_bidders=3,
+                                                                      values=[i for i in range(1, 11)])
+        # for sm_market in all_sm_markets:
+        #    print(bidders.SingleMinded.get_pretty_representation(sm_market))
+        print(f"there are {len(all_sm_markets)} sm markets. ")

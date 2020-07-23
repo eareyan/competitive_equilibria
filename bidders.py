@@ -1,5 +1,7 @@
 import random
+import itertools as it
 from typing import Set, Dict
+from market import Market
 from market_constituents import Good, Bidder
 from prettytable import PrettyTable
 
@@ -185,5 +187,50 @@ class SingleMinded(Bidder):
 
         return sm_pretty_matrix
 
+    @staticmethod
+    def generate_all_sm_markets(num_goods, num_bidders, values):
+        """
+        Generates all possible single minded markets.
+        """
+        goods = [Good(i) for i in range(0, num_goods)]
+        bidders_indices = [i for i in range(0, num_bidders)]
+        return SingleMinded.__generate_all_sm_markets_helper(goods, bidders_indices, values, {})
+
+    @staticmethod
+    def __generate_all_sm_markets_helper(all_goods, bidders_indices, values, preferred_bundles):
+        """
+        """
+        if len(bidders_indices) == 0:
+            new_bidders = set()
+            for sm_bidder_index, (preferred_bundle, preferred_value) in preferred_bundles.items():
+                the_bidder = SingleMinded(sm_bidder_index, all_goods, random_init=False)
+                the_bidder.set_preferred_bundle(preferred_bundle)
+                the_bidder.set_value(preferred_value)
+                new_bidders.add(the_bidder)
+            return [Market(all_goods, new_bidders)]
+
+        # Select the next bidder.
+        current_bidder = bidders_indices[0]
+        new_bidders = bidders_indices[1:]
+
+        # Enumerate all possible bundles.
+        s = list(all_goods)
+        available_bundles = list(it.chain.from_iterable(it.combinations(s, r) for r in range(1, len(s) + 1)))
+
+        # Copy the preferences.
+        new_preferred_bundles = preferred_bundles.copy()
+
+        # Store all sm markets.
+        all_sm_markets = []
+
+        # Loop through all possible bundles and values for the current bidder.
+        for current_bundle, current_value in it.product(available_bundles, values):
+            new_preferred_bundles[current_bidder] = (current_bundle, current_value)
+            all_sm_markets += SingleMinded.__generate_all_sm_markets_helper(all_goods, new_bidders, values, new_preferred_bundles)
+
+        return all_sm_markets
+
 
 types_of_bidders = [Additive, AdditiveWithBudget, SingleMinded]
+
+# TODO make a double, single-minded bidder. It has 2 preferred bundles and 2 values. Maybe quadratic helps here?
