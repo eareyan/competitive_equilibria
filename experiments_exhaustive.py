@@ -9,31 +9,22 @@ from typing import List
 def generate_all_sm_markets(num_goods: int, num_bidders: int, values: List[int]):
     all_sm_markets = bidders.SingleMinded.generate_all_sm_markets(num_goods, num_bidders, values)
 
+    goods = [Good(i) for i in range(0, num_goods)]
     market_data = []
     for i, sm_market in enumerate(all_sm_markets):
         all_bidders = sm_market.get_bidders()
-        good_0 = Good(0)
-        good_1 = Good(1)
-        good_2 = Good(2)
         bidder_data = [i]
         for bidder in all_bidders:
-            bidder_data += [[1 if good_0 in bidder.get_preferred_bundle() else 0,
-                             1 if good_1 in bidder.get_preferred_bundle() else 0,
-                             1 if good_2 in bidder.get_preferred_bundle() else 0],
+            bidder_data += [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods],
                             bidder.get_value_preferred_bundle()]
         bidder_data += [-1, -1]
         market_data += [bidder_data]
 
     markets_df = pd.DataFrame(market_data,
-                              columns=['market',
-                                       'bidder_0',
-                                       'value_0',
-                                       'bidder_1',
-                                       'value_1',
-                                       'bidder_2',
-                                       'value_2',
-                                       'linear_prices',
-                                       'quadratic_prices']
+                              columns=['market'] +
+                                      [f"bidder_{i}" for i in range(0, num_bidders)] +
+                                      [f"value_{i}" for i in range(0, num_bidders)] +
+                                      ['linear_prices', 'quadratic_prices']
                               )
 
     markets_df.to_csv(f'markets_df/single_minded__num_goods_{num_goods}__num_bidders__{num_bidders}__values_{len(values)}.gzip', index=False, compression='gzip')
@@ -103,9 +94,9 @@ def batch_process(num_goods: int, num_bidders: int, values: List[int]):
     merged.to_csv(data_location, index=False, compression='gzip')
 
 
-the_num_goods = 3
-the_num_bidders = 3
-the_values = [i for i in range(1, 11)]
-# the_values = [i for i in range(1, 3)]
-# generate_all_sm_markets(the_num_goods, the_num_bidders, the_values)
-batch_process(the_num_goods, the_num_bidders, the_values)
+the_num_goods = 2
+the_num_bidders = 2
+# the_values = [i for i in range(1, 11)]
+the_values = [i for i in range(1, 3)]
+generate_all_sm_markets(the_num_goods, the_num_bidders, the_values)
+# batch_process(the_num_goods, the_num_bidders, the_values)
