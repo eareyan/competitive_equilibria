@@ -1,102 +1,86 @@
-import bidders
-import pandas as pd
 from market import Market
 from market_constituents import Good
-from market_inspector import MarketInspector
-from typing import List
+from bidders import SingleMinded
+import itertools as it
+import pandas as pd
+import time
+
+t0 = time.time()
+# All that follows is w.r.t single-minded valuations and a fixed set of values bidders can have.
+LEN_BIG_PARTITION = 1
+LEN_SMALL_PARTITION = 2
+BIG_PARTITION = 3
+SMALL_PARTITION = 4
+EDGES = 5
 
 
-def generate_all_sm_markets(num_goods: int, num_bidders: int, values: List[int]):
-    all_sm_markets = bidders.SingleMinded.generate_all_sm_markets(num_goods, num_bidders, values)
+def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
+    """
+    Given a set of numbers graph_goods, a set of numbers graph_goods, and a tuple of tuples graph_edges,
+    creates a single minded market
+    :return: a single-minded market
+    """
+    # Create the goods
+    mapOfGoods = {i: Good(i) for i in eval(graph_goods)}
+    setOfGoods = set(mapOfGoods.values())
 
-    goods = [Good(i) for i in range(0, num_goods)]
-    market_data = []
-    for i, sm_market in enumerate(all_sm_markets):
-        all_bidders = sm_market.get_bidders()
-        bidder_data = [i]
-        for bidder in all_bidders:
-            bidder_data += [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods],
-                            bidder.get_value_preferred_bundle()]
-        bidder_data += [-1, -1]
-        market_data += [bidder_data]
+    # Create the bidders - just their ids, we will populate their preferred sets and values later.
+    mapOfBidders = {i: SingleMinded(i, setOfGoods, random_init=False) for i in eval(graph_bidders)}
+    setOfBidders = set(mapOfBidders.values())
 
-    markets_df = pd.DataFrame(market_data,
-                              columns=['market'] +
-                                      [f"bidder_{i}" for i in range(0, num_bidders)] +
-                                      [f"value_{i}" for i in range(0, num_bidders)] +
-                                      ['linear_prices', 'quadratic_prices']
-                              )
+    # For each edges of the bipartite graph, translate it to a set of goods.
+    edge_bidder_good = {bidder.get_id(): set() for bidder in setOfBidders}
+    for edges in eval(graph_edges):
+        if edges[0] in edge_bidder_good:
+            edge_bidder_good[edges[0]].add(mapOfGoods[edges[1]])
+        else:
+            edge_bidder_good[edges[1]].add(mapOfGoods[edges[0]])
 
-    markets_df.to_csv(f'markets_df/single_minded__num_goods_{num_goods}__num_bidders__{num_bidders}__values_{len(values)}.gzip', index=False, compression='gzip')
+    # Update each bidder's preferred bundle.
+    for bidder in setOfBidders:
+        mapOfBidders[bidder.get_id()].set_preferred_bundle(edge_bidder_good[bidder.get_id()])
 
-
-setOfGoods = {Good(i) for i in range(0, 3)}
-
-
-def check_if_linear_clears(row):
-    # Create single-minded market from DataFrame.
-    if int(row['market']) % 1000 == 0:
-        print(row['market'])
-    setOfBidders = set()
-    for i in range(0, 3):
-        the_bidder = bidders.SingleMinded(i, setOfGoods, False)
-        bidder_demand_set = eval(row[f"bidder_{i}"])
-        preferred_bundle = set()
-        for j in range(0, 3):
-            if bidder_demand_set[j] == 1:
-                preferred_bundle.add(Good(j))
-        the_bidder.set_preferred_bundle(preferred_bundle)
-        the_bidder.set_value(row[f"value_{i}"])
-        setOfBidders.add(the_bidder)
-    sm_market = Market(setOfGoods, setOfBidders)
-    # print(bidders.SingleMinded.get_pretty_representation(sm_market))
-
-    # Solve for the welfare-maximizing allocation.
-    welfare_max_result_ilp = sm_market.welfare_max_program()
-    # print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-    # print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
-
-    # Solve for a utility-maximizing pricing.
-    linear_pricing_result = sm_market.linear_pricing(welfare_max_result_ilp['optimal_allocation'])
-    # print(MarketInspector.pretty_print_pricing(linear_pricing_result))
-    # print(MarketInspector.pricing_stats_table(linear_pricing_result))
-    # print(linear_pricing_result['status'])
-    row['linear_prices'] = 1 if linear_pricing_result['status'] == 'Optimal' else 0
-
-    # Try to compute non-linear CE prices.
-    non_linear_pricing_result = sm_market.non_linear_pricing(welfare_max_result_ilp['optimal_allocation'])
-    # print(MarketInspector.pretty_print_pricing(non_linear_pricing_result))
-    # print(MarketInspector.pricing_stats_table(non_linear_pricing_result))
-    # print(non_linear_pricing_result['status'])
-    row['quadratic_prices'] = 1 if non_linear_pricing_result['status'] == 'Optimal' else 0
-
-    return row
+    return Market(setOfGoods, setOfBidders)
 
 
-def batch_process(num_goods: int, num_bidders: int, values: List[int]):
-    # data = pd.read_csv('markets_df/single_minded__num_goods_3__num_bidders__3__values_10.gzip', compression='gzip')
-    data_location = f"markets_df/single_minded__num_goods_{num_goods}__num_bidders__{num_bidders}__values_{len(values)}.gzip"
-    data = pd.read_csv(data_location, compression='gzip')
-    piece_of_data = data[(data['market'] >= 0)]
-    print(f"piece_of_data = {piece_of_data}")
-    piece_of_data = piece_of_data.apply(lambda row: check_if_linear_clears(row), axis=1)
-    piece_of_data = piece_of_data[['market', 'linear_prices', 'quadratic_prices']]
-    # Merge the data processed so far with the original data.
-    merged = data.merge(piece_of_data, how='left', left_on='market', right_on='market', validate='one_to_one')
-    # Fill NaN with -1.
-    merged = merged.fillna(-1)
-    # Drop unneeded columns, rename columns, and cast columns to int
-    merged = merged.drop('linear_prices_x', 1)
-    merged = merged.drop('quadratic_prices_x', 1)
-    merged = merged.rename(columns={'linear_prices_y': 'linear_prices', 'quadratic_prices_y': 'quadratic_prices'})
-    merged = merged.astype({'linear_prices': 'int8'})
-    merged = merged.astype({'quadratic_prices': 'int8'})
-    merged.to_csv(data_location, index=False, compression='gzip')
+def save_non_iso_markets(num_vertices):
+    # For each non-isomorphic graph G.
+    non_iso_graphs = pd.read_csv(f"non_iso_bipartite_graphs/non_isomorphic_bipartite_connected_vertices_{num_vertices}.gzip", compression='gzip')
+    list_data_frame = []
+    for row in non_iso_graphs.itertuples():
+        markets = []
+        # print(f"#{counter}")
+        # print(row[LEN_BIG_PARTITION], row[LEN_SMALL_PARTITION], row[BIG_PARTITION], row[SMALL_PARTITION], row[EDGES])
+        sm_market = create_sm_market_from_graph(row[BIG_PARTITION], row[SMALL_PARTITION], row[EDGES])
+        markets += [sm_market]
+        # Check if its horizontal reflection H(G) is "market equivalent" to G.
+        # If it is not, then consider H(G) and G in what follows. Otherwise, consider only G.
+        if not SingleMinded.is_sm_market_hor_reflect_equiv(sm_market):
+            # The reflected market is not equivalent to the original market, hence, a valid reflection.
+            sm_market_reflected = create_sm_market_from_graph(row[SMALL_PARTITION], row[BIG_PARTITION], row[EDGES])
+            markets += [sm_market_reflected]
+        for market in markets:
+            data_frame_row = SingleMinded.get_data_frame_row(market)
+            # print(SingleMinded.get_pretty_representation(market))
+            # print(data_frame_row)
+            list_data_frame += data_frame_row
+    data_frame = pd.DataFrame(list_data_frame)
+    data_frame.columns = ['num_bidders', 'num_goods'] + [f"bidder_{i}" for i in range(0, len(data_frame.columns) - 2)]
+    data_frame.to_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gzip", index=False, compression='gzip')
+    print(f"it took {time.time() - t0} sec")
 
 
-the_num_goods = 2
-the_num_bidders = 2
-# the_values = [i for i in range(1, 11)]
-the_values = [i for i in range(1, 3)]
-generate_all_sm_markets(the_num_goods, the_num_bidders, the_values)
-# batch_process(the_num_goods, the_num_bidders, the_values)
+# for i in range(2, 17):
+#    save_non_iso_markets(i)
+
+# Complete graphs with values. Use multiset so as to avoid symmetries for values.
+values = [1, 2, 3]
+num_equiv_bidders = 3
+for value_assignment in it.combinations_with_replacement(values, num_equiv_bidders):
+    print(value_assignment)
+
+# For each graph completed with value, check
+#   (1) Do linear prices clear the market?
+#   (2) Do quadratic prices clear the market?
+
+# Save the statistics.

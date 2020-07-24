@@ -52,10 +52,12 @@ class Additive(Bidder):
         """
         additive_matrix_pretty_matrix = PrettyTable()
         additive_matrix_pretty_matrix.title = 'Additive Market'
-        additive_matrix_pretty_matrix.field_names = ['B\G'] + [good for good in additive_market.get_goods()]
+        # Get a list of goods so that we can guarantee the order of the set.
+        goods = list(additive_market.get_goods())
+        additive_matrix_pretty_matrix.field_names = ['B\G'] + [good for good in goods]
 
         for bidder in additive_market.get_bidders():
-            additive_matrix_pretty_matrix.add_row([bidder] + [bidder.get_good_value(good) for good in additive_market.get_goods()])
+            additive_matrix_pretty_matrix.add_row([bidder] + [bidder.get_good_value(good) for good in goods])
 
         return additive_matrix_pretty_matrix
 
@@ -109,10 +111,12 @@ class AdditiveWithBudget(Additive):
         """
         awb_pretty_matrix = PrettyTable()
         awb_pretty_matrix.title = 'Additive with Budget Market'
-        awb_pretty_matrix.field_names = ['B\G'] + [good for good in awb_market.get_goods()] + ['Budget']
+        # Get a list of goods so that we can guarantee the order of the set.
+        goods = list(awb_market.get_goods())
+        awb_pretty_matrix.field_names = ['B\G'] + [good for good in goods] + ['Budget']
 
         for bidder in awb_market.get_bidders():
-            awb_pretty_matrix.add_row([bidder] + [bidder.get_good_value(good) for good in awb_market.get_goods()] + [bidder.get_budget()])
+            awb_pretty_matrix.add_row([bidder] + [bidder.get_good_value(good) for good in goods] + [bidder.get_budget()])
 
         return awb_pretty_matrix
 
@@ -172,6 +176,69 @@ class SingleMinded(Bidder):
         return self._value if self._preferred_bundle.issubset(bundle) else 0.0
 
     @staticmethod
+    def get_data_frame_row(sm_market):
+        # Get a list of goods so that we can guarantee the order.
+        goods = list(sm_market.get_goods())
+        return [[len(sm_market.get_bidders()), len(sm_market.get_goods())] + \
+                [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in sm_market.get_bidders()]]
+
+    @staticmethod
+    def count_bidders_pref_bundle_sizes(sm_market):
+        """
+
+        """
+        counts = {}
+        for bidder in sm_market.get_bidders():
+            pref_bundle_size = len(bidder.get_preferred_bundle())
+            if pref_bundle_size not in counts:
+                counts[pref_bundle_size] = 1
+            else:
+                counts[pref_bundle_size] = counts[pref_bundle_size] + 1
+        return [counts[g] if g in counts else 0 for g in range(0, len(sm_market.get_goods()) + 1)]
+
+    @staticmethod
+    def count_goods_demand(sm_market):
+        """
+
+        """
+        counts = {}
+        for good in sm_market.get_goods():
+            total_demand_for_good = 0
+            for bidder in sm_market.get_bidders():
+                if good in bidder.get_preferred_bundle():
+                    total_demand_for_good += 1
+            if total_demand_for_good not in counts:
+                counts[total_demand_for_good] = 1
+            else:
+                counts[total_demand_for_good] = counts[total_demand_for_good] + 1
+        return [counts[b] if b in counts else 0 for b in range(0, len(sm_market.get_bidders()) + 1)]
+
+    @staticmethod
+    def is_sm_market_hor_reflect_equiv(sm_market):
+        """
+        Compute a metric of whether a market is equivalent to its horizontal reflection.
+        (The metric is sufficient, i.e.,
+            if the market is equivalent to its reflection, then the metric holds;
+        but remains to see if it is necessary, i.e.,
+            if the metric holds, is it the case that the market is equivalent to its horizontal reflection?).
+        The metric is:
+            For all k:
+                is the number of bidders that demand k goods in the original market the same as the number of bidders that demand k goods in its reflection?
+            and
+            For all k:
+                is the number goods demanded by k bidders in the original market the same as the number of goods demanded by k bidders in its reflection?
+        :return: True iff the input market is equivalent under horizontal reflection.
+        """
+        # If the market does not have the same number of bidders as goods, then it is immediately not equivalent to its horizontal reflection.
+        if len(sm_market.get_bidders()) != len(sm_market.get_goods()):
+            return False
+        # At this point, we can assume that the number of bidders is the same as the number of goods for the market.
+        # Note that, by symmetry, SingleMinded.count_goods_demand(sm_market) computes the count of the bidders' demand sizes in the reflected market.
+        # Likewise, SingleMinded.count_bidders_pref_bundle_sizes(sm_market) computes the count of goods' demands in the reflected market.
+        # Finally, the horizontal reflection of the horizontal reflection is the original market.
+        return SingleMinded.count_bidders_pref_bundle_sizes(sm_market) == SingleMinded.count_goods_demand(sm_market)
+
+    @staticmethod
     def get_pretty_representation(sm_market):
         """
         Computes a pretty table with preferred bundles, as well as values for them.
@@ -180,17 +247,18 @@ class SingleMinded(Bidder):
         """
         sm_pretty_matrix = PrettyTable()
         sm_pretty_matrix.title = 'Single-minded Market'
-        sm_pretty_matrix.field_names = ['B\G'] + [good for good in sm_market.get_goods()] + ['Value']
-
+        # Get a list of goods so that we can guarantee the order of the set.
+        goods = list(sm_market.get_goods())
+        sm_pretty_matrix.field_names = ['B\G'] + [good for good in goods] + ['Value']
         for bidder in sm_market.get_bidders():
-            sm_pretty_matrix.add_row([bidder] + [1 if good in bidder.get_preferred_bundle() else 0 for good in sm_market.get_goods()] + [bidder.get_value_preferred_bundle()])
+            sm_pretty_matrix.add_row([bidder] + [1 if good in bidder.get_preferred_bundle() else 0 for good in goods] + [bidder.get_value_preferred_bundle()])
 
         return sm_pretty_matrix
 
     @staticmethod
     def generate_all_sm_markets(num_goods, num_bidders, values):
         """
-        Generates all possible single minded markets.
+        Brute-force generates all possible single minded markets. Does not take care of symmetries.
         """
         goods = [Good(i) for i in range(0, num_goods)]
         bidders_indices = [i for i in range(0, num_bidders)]
