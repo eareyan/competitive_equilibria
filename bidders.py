@@ -142,12 +142,12 @@ class SingleMinded(Bidder):
             raise Exception("The preferred bundle can only be set once. ")
         self._preferred_bundle = preferred_bundle
 
-    def set_value(self, value: float):
+    def set_value(self, value: float, safe_check=True):
         """
         Setter.
         :param value: the bidder's value
         """
-        if self._value is not None:
+        if safe_check and self._value is not None:
             raise Exception("The value can only be set once. ")
         self._value = value
 
@@ -176,11 +176,27 @@ class SingleMinded(Bidder):
         return self._value if self._preferred_bundle.issubset(bundle) else 0.0
 
     @staticmethod
-    def get_data_frame_row(sm_market):
+    def clone(sm_market):
+        new_bidders = set()
+        for old_bidder in sm_market.get_bidders():
+            new_bidder = SingleMinded(old_bidder.get_id(), sm_market.get_goods(), random_init=False)
+            new_bidder.set_preferred_bundle(old_bidder.get_preferred_bundle())
+            new_bidder.set_value(old_bidder.get_value_preferred_bundle())
+            new_bidders.add(new_bidder)
+        return Market(sm_market.get_goods(), new_bidders)
+
+    @staticmethod
+    def get_data_frame_row(sm_market, include_values=False):
         # Get a list of goods so that we can guarantee the order.
         goods = list(sm_market.get_goods())
-        return [[len(sm_market.get_bidders()), len(sm_market.get_goods())] + \
-                [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in sm_market.get_bidders()]]
+        if include_values:
+            row = [[len(sm_market.get_bidders()), len(sm_market.get_goods())] + \
+                   [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in sm_market.get_bidders()] + \
+                   [b.get_value_preferred_bundle() for b in sm_market.get_bidders()]]
+        else:
+            row = [[len(sm_market.get_bidders()), len(sm_market.get_goods())] + \
+                   [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in sm_market.get_bidders()]]
+        return row
 
     @staticmethod
     def count_bidders_pref_bundle_sizes(sm_market):
@@ -256,47 +272,23 @@ class SingleMinded(Bidder):
         return sm_pretty_matrix
 
     @staticmethod
-    def generate_all_sm_markets(num_goods, num_bidders, values):
+    def compute_bidders_equivalence_classes(sm_market):
         """
-        Brute-force generates all possible single minded markets. Does not take care of symmetries.
+        Given a single-minded market, compute the equivalence classes over bidders for the following relation.
+        Bidder i = Bidder k iff Bidder's i preferred bundle = Bidder's j preferred bundle.
+        :return: a list of lists, each inner list of bidders.
         """
-        goods = [Good(i) for i in range(0, num_goods)]
-        bidders_indices = [i for i in range(0, num_bidders)]
-        return SingleMinded.__generate_all_sm_markets_helper(goods, bidders_indices, values, {})
-
-    @staticmethod
-    def __generate_all_sm_markets_helper(all_goods, bidders_indices, values, preferred_bundles):
-        """
-        """
-        if len(bidders_indices) == 0:
-            new_bidders = set()
-            for sm_bidder_index, (preferred_bundle, preferred_value) in preferred_bundles.items():
-                the_bidder = SingleMinded(sm_bidder_index, all_goods, random_init=False)
-                the_bidder.set_preferred_bundle(preferred_bundle)
-                the_bidder.set_value(preferred_value)
-                new_bidders.add(the_bidder)
-            return [Market(all_goods, new_bidders)]
-
-        # Select the next bidder.
-        current_bidder = bidders_indices[0]
-        new_bidders = bidders_indices[1:]
-
-        # Enumerate all possible bundles.
-        s = list(all_goods)
-        available_bundles = list(it.chain.from_iterable(it.combinations(s, r) for r in range(1, len(s) + 1)))
-
-        # Copy the preferences.
-        new_preferred_bundles = preferred_bundles.copy()
-
-        # Store all sm markets.
-        all_sm_markets = []
-
-        # Loop through all possible bundles and values for the current bidder.
-        for current_bundle, current_value in it.product(available_bundles, values):
-            new_preferred_bundles[current_bidder] = (current_bundle, current_value)
-            all_sm_markets += SingleMinded.__generate_all_sm_markets_helper(all_goods, new_bidders, values, new_preferred_bundles)
-
-        return all_sm_markets
+        list_of_bidders = list(sm_market.get_bidders().copy())
+        partition = []
+        while len(list_of_bidders) > 0:
+            cur_bidder = list_of_bidders[0]
+            equiv_class = []
+            for bidder in list_of_bidders:
+                if bidder.get_preferred_bundle() == cur_bidder.get_preferred_bundle():
+                    equiv_class += [bidder]
+            list_of_bidders = [bidder for bidder in list_of_bidders if bidder not in equiv_class]
+            partition += [equiv_class]
+        return partition
 
 
 types_of_bidders = [Additive, AdditiveWithBudget, SingleMinded]

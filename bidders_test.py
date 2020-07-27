@@ -1,5 +1,6 @@
 import unittest
 import bidders
+import random
 from market import Market
 from market_constituents import Good
 from market_inspector import MarketInspector
@@ -106,10 +107,35 @@ class MyTestCase(unittest.TestCase):
         print(MarketInspector.pretty_print_allocation(allocation_brute_force))
         self.assertEqual(welfare_brute_force, 10.0)
 
-    def test_generate_all_sm_markets(self):
-        all_sm_markets = bidders.SingleMinded.generate_all_sm_markets(num_goods=3,
-                                                                      num_bidders=3,
-                                                                      values=[i for i in range(1, 11)])
-        # for sm_market in all_sm_markets:
-        #    print(bidders.SingleMinded.get_pretty_representation(sm_market))
-        print(f"there are {len(all_sm_markets)} sm markets. ")
+    def test_sm_equivalence_class(self):
+        num_goods = 4
+        num_bidders = 4
+        for _ in range(0, 10):
+            setOfGoods = {Good(i) for i in range(0, num_goods)}
+            setOfBidders = {bidders.SingleMinded(i, setOfGoods, random_init=False) for i in range(0, num_bidders)}
+            for bidder in setOfBidders:
+                bidder.set_preferred_bundle(set(random.sample(setOfGoods, k=random.randint(1, len(setOfGoods)))))
+            sm_market = Market(setOfGoods, setOfBidders)
+            print(bidders.SingleMinded.get_pretty_representation(sm_market))
+            print(bidders.SingleMinded.compute_bidders_equivalence_classes(sm_market))
+
+    def test_clone_sm_market(self):
+        setOfGoods = {Good(i) for i in range(0, 3)}
+        setOfBidders = {bidders.SingleMinded(0, setOfGoods, random_init=False)}
+        market_0 = Market(setOfGoods, setOfBidders)
+        print(market_0)
+
+        market_1 = bidders.SingleMinded.clone(market_0)
+        print(market_1)
+
+        # Update market 1
+        print('\n')
+        for bidder in market_1.get_bidders():
+            print(bidder.get_preferred_bundle())
+            bidder.set_preferred_bundle({Good(0), Good(1)})
+            print(bidder.get_preferred_bundle())
+
+        # Market 0 should stay the same
+        print('\n')
+        for bidder in market_0.get_bidders():
+            print(f"market_0: {bidder.get_preferred_bundle()}")
