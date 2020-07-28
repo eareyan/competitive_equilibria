@@ -1,0 +1,4 @@
+
+ total: 385 
+ clear_with_linear_prices: 385 
+ no_clear_with_linear_prices: 0

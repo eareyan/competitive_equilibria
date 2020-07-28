@@ -1,0 +1,4 @@
+
+ total: 227565 
+ clear_with_linear_prices: 225825 
+ no_clear_with_linear_prices: 1740

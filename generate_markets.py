@@ -144,12 +144,26 @@ def generate_and_save_all_sm_markets():
             complete_markets_with_sm_values(i, values, f"1_to_{t}")
 
 
-# For each graph completed with value, check
-#   (1) Do linear prices clear the market?
-#   (2) Do quadratic prices clear the market?
-
-# Save the statistics.
-
+"""
+Pipeline for generating non-isomorphic, single-minded marekts.
+    (1) Run generate_non_iso_bipartite_graphs.py (see instructions there).
+        This will generate all non-isomorphic, connected, bipartite graphs. 
+        These graphs are saved as .csv files in folder non_iso_bipartite_graphs/
+    (2) Run the following functions from this file in the given order:
+        (2.1)  generate_and_save_all_non_iso_markets()
+                This will generate all non-isomorphic single-minded markets but with no values.
+                For each market in folder non_iso_bipartite_graphs/, saves a market in folder non_iso_markets/
+                All these markets will be saved as .csv files.
+        (2.2) generate_and_save_all_sm_markets()
+                This will complete the non-isomorphic markets by adding values to bidders.
+                For each market in folder non_iso_markets/, saves markets in folder all_sm_markets/
+    Summary of input output .csv files:
+        generate_non_iso_bipartite_graphs.py -> non_iso_bipartite_graphs/ 
+        non_iso_bipartite_graphs/ -> generate_and_save_all_non_iso_markets() -> non_iso_markets/
+        non_iso_markets/ -> generate_and_save_all_sm_markets() -> all_sm_markets/
+    
+    Markets in folder all_sm_markets/ are meant to be ready to experiment with, see experiments.py.  
+"""
 # generate_and_save_all_non_iso_markets()
 
-generate_and_save_all_sm_markets()
+# generate_and_save_all_sm_markets()

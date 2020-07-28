@@ -1,4 +1,5 @@
 import pandas as pd
+import gzip
 from market import Market
 from market_constituents import Good
 from market_inspector import MarketInspector
@@ -27,6 +28,9 @@ def check_ce(sm_market):
 
 
 def create_sm_market_from_df(row):
+    """
+    Given a data frame row, returns a single-minded market.
+    """
     NUM_BIDDERS_INDEX = 2
     NUM_GOODS_INDEX = 3
     num_bidders = row[NUM_BIDDERS_INDEX]
@@ -48,21 +52,45 @@ def create_sm_market_from_df(row):
         print(f"linear = {linear}")
         print(f"non_linear = {non_linear}")
         print(SingleMinded.get_pretty_representation(sm_market))
-        return False
-    return True
+        return False, sm_market
+    return True, sm_market
 
-# total = 7
-# up_to_value = 7
-# sm_markets = pd.read_csv(f"all_sm_markets/values_1_to_{up_to_value}/sm_market_{total}_values_1_to_{up_to_value}.gzip", compression='gzip')
-# print(sm_markets)
-# t = 0
-# non_feasible = 0
-# feasible = 0
-# for row in sm_markets.itertuples():
-#     t += 1
-#     print(f"\r {(t / len(sm_markets)) * 100 : .2f} %", end='')
-#     if create_sm_market_from_df(row):
-#         feasible += 1
-#     else:
-#         non_feasible += 1
-# print(f"total = {len(sm_markets)}, feasible = {feasible}, non_feasible = {non_feasible}")
+
+def write_experiment_results(total, up_to_value):
+    print(f"Summarizing statistics for single-minded market with {total} vertices and values 1_to_{up_to_value}")
+    # Read all the single-minded markets.
+    sm_markets = pd.read_csv(f"all_sm_markets/values_1_to_{up_to_value}/sm_market_{total}_values_1_to_{up_to_value}.gzip", compression='gzip')
+
+    # Keep counts of the markets that clear and that don't clear
+    clear_with_linear_prices = 0
+    no_clear_with_linear_prices = 0
+
+    # For each market in the sm_markets data frame.
+    for t, row in enumerate(sm_markets.itertuples(), 1):
+        # Report progress.
+        print(f"\r {(t / len(sm_markets)) * 100 : .2f} %", end='')
+
+        # Create the single-minded market from the dataframe row.
+        clears, sm_market = create_sm_market_from_df(row)
+        clear_with_linear_prices = clear_with_linear_prices + (1 if clears else 0)
+        no_clear_with_linear_prices = no_clear_with_linear_prices + (1 if not clears else 0)
+
+        # Record the cases where the market does not clear.
+        if not clears:
+            with open(f"experiments_results/fail_markets_{total}_values_1_to_{up_to_value}_examples.txt", 'a') as fail_example_file:
+                # Writing data to a file
+                fail_example_file.write(str(SingleMinded.get_pretty_representation(sm_market)) + '\n')
+    # Summarize the experiments. How many markets total? How many f
+    summary = f"\n total: {len(sm_markets)} \n clear_with_linear_prices: {clear_with_linear_prices} \n no_clear_with_linear_prices: {no_clear_with_linear_prices}"
+    print(summary)
+    with open(f"experiments_results/fail_markets_{total}_values_1_to_{up_to_value}.txt", 'w') as fail_example_file:
+        # Writing data to a file
+        fail_example_file.write(summary + '\n')
+
+
+the_up_to_value = 10
+for i in range(2, 11):
+    write_experiment_results(i, the_up_to_value)
+# with gzip.open(f"all_sm_markets/values_1_to_10/sm_market_2_values_1_to_10.gzip", 'rt') as f:
+#     for line in f:
+#         print('got line', line)
