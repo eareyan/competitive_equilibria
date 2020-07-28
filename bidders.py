@@ -199,6 +199,14 @@ class SingleMinded(Bidder):
         return row
 
     @staticmethod
+    def get_csv_row(sm_market):
+        goods = list(sm_market.get_goods())
+        csv_row = f"{len(sm_market.get_bidders())},{len(sm_market.get_goods())}," + \
+                  ','.join(['"' + str([1 if good in bidder.get_preferred_bundle() else 0 for good in goods]) + '"' for bidder in sm_market.get_bidders()]) + "," + \
+                  ','.join([str(int(bidder.get_value_preferred_bundle())) for bidder in sm_market.get_bidders()])
+        return csv_row
+
+    @staticmethod
     def count_bidders_pref_bundle_sizes(sm_market):
         """
 

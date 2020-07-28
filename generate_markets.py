@@ -5,6 +5,7 @@ from os import path
 import itertools as it
 import pandas as pd
 import time
+import gzip
 
 
 def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
@@ -86,9 +87,17 @@ def complete_markets_with_sm_values(num_vertices, support_values, values_file_st
         return
 
     t0 = time.time()
-    list_data_frame = []
+    # Create a gzip file.
+    the_file = gzip.open(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gzip", 'ab')
+    # Write the header of the gzip file.
+    the_file.write("index,num_bidders,num_goods,".encode("utf-8") +
+                   ','.join([f"col_{i}" for i in range(0, (num_vertices - 1) * 2)]).encode("utf-8") +
+                   '\n'.encode("utf-8"))
     total_non_iso_markets = 0
+    total_non_iso_markets_with_value = 0
+    # For each possible non_iso market, complete with value and save the resulting single-minded market to the gzip file.
     for row in non_iso_markets.itertuples():
+        # First, from the csv file create a single-minded market.
         total_non_iso_markets += 1
         print(f"\r {(total_non_iso_markets / len(non_iso_markets)) * 100 : .2f} %", end='')
         num_bidders = row[NUM_BIDDERS_INDEX]
@@ -101,31 +110,23 @@ def complete_markets_with_sm_values(num_vertices, support_values, values_file_st
             sm_bidder = SingleMinded(i - 1, setOfGoods, random_init=False)
             sm_bidder.set_preferred_bundle({listOfGoods[j] for j in range(0, num_goods) if bidder_demand_vector[j] == 1})
             setOfBidders.add(sm_bidder)
-        # Compute the market and its equivalence classes.
+        # Compute the single-minded market equivalence classes.
         sm_market = Market(setOfGoods, setOfBidders)
         equivalence_classes = SingleMinded.compute_bidders_equivalence_classes(sm_market)
+        # Now, complete the market with values using multiset for bidders in the same equivalence class.
         for value_assignment in it.product(*[it.combinations_with_replacement(support_values, len(equivalence_class)) for equivalence_class in equivalence_classes]):
             k = 0
             for bidder_class in equivalence_classes:
                 for t, bidder in enumerate(bidder_class):
                     bidder.set_value(value_assignment[k][t], safe_check=False)
                 k += 1
-            list_data_frame += SingleMinded.get_data_frame_row(sm_market, include_values=True)
+            the_file.write((str(total_non_iso_markets_with_value) + ",").encode("utf-8") +
+                           str(SingleMinded.get_csv_row(sm_market)).encode("utf-8") +
+                           '\n'.encode("utf-8"))
+            total_non_iso_markets_with_value += 1
 
-    # Get a data frame.
-    print(f"\n Creating data frame.")
-    data_frame = pd.DataFrame(list_data_frame)
-    data_frame.columns = ['num_bidders', 'num_goods'] + \
-                         [f"col_{i}" for i in range(0, len(data_frame.columns) - 2)]
-    # Fill missing values with -1
-    data_frame = data_frame.fillna(-1)
-    # Cast as many of the value columns as possible to integers.
-    value_cols = list(reversed(data_frame.columns))[:num_vertices - 1]
-    data_frame[value_cols] = data_frame[value_cols].astype(int)
-    data_frame.index.name = 'index'
-    print(f" Saving data frame as a .gzip file.")
-    data_frame.to_csv(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gzip", compression='gzip')
     print(f" Done, it took {time.time() - t0} sec")
+    the_file.close()
 
 
 def generate_and_save_all_non_iso_markets():
@@ -136,7 +137,8 @@ def generate_and_save_all_non_iso_markets():
 
 def generate_and_save_all_sm_markets():
     # Generate all single-minded markets we can!
-    for t in range(2, 11):
+    # for t in range(2, 11):
+    for t in range(10, 11):
         values = [k for k in range(1, t + 1)]
         for i in range(2, 11):
             complete_markets_with_sm_values(i, values, f"1_to_{t}")
