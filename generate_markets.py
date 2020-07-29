@@ -48,7 +48,7 @@ def save_non_iso_markets(num_vertices):
     EDGES = 5
 
     # For each non-isomorphic graph G.
-    non_iso_graphs = pd.read_csv(f"non_iso_bipartite_graphs/non_isomorphic_bipartite_connected_vertices_{num_vertices}.gzip", compression='gzip')
+    non_iso_graphs = pd.read_csv(f"non_iso_bipartite_graphs/non_isomorphic_bipartite_connected_vertices_{num_vertices}.gz", compression='gzip')
     list_data_frame = []
     for row in non_iso_graphs.itertuples():
         markets = []
@@ -69,7 +69,7 @@ def save_non_iso_markets(num_vertices):
             list_data_frame += data_frame_row
     data_frame = pd.DataFrame(list_data_frame)
     data_frame.columns = ['num_bidders', 'num_goods'] + [f"bidder_{i}" for i in range(0, len(data_frame.columns) - 2)]
-    data_frame.to_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gzip", index=False, compression='gzip')
+    data_frame.to_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gz", index=False, compression='gzip')
     print(f"it took {time.time() - t0} sec")
 
 
@@ -80,15 +80,15 @@ def complete_markets_with_sm_values(num_vertices, support_values, values_file_st
     NUM_BIDDERS_INDEX = 1
     NUM_GOODS_INDEX = 2
 
-    non_iso_markets = pd.read_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gzip", compression='gzip')
+    non_iso_markets = pd.read_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gz", compression='gzip')
     print(f"\n Computing single-minded markets, {num_vertices} vertices (total of {len(non_iso_markets)} markets) for values {values_file_str}")
-    if path.exists(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gzip"):
+    if path.exists(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gz"):
         print(f" \t already in disk")
         return
 
     t0 = time.time()
     # Create a gzip file.
-    the_file = gzip.open(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gzip", 'ab')
+    the_file = gzip.open(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gz", 'ab')
     # Write the header of the gzip file.
     the_file.write("index,num_bidders,num_goods,".encode("utf-8") +
                    ','.join([f"col_{i}" for i in range(0, (num_vertices - 1) * 2)]).encode("utf-8") +
@@ -167,3 +167,5 @@ Pipeline for generating non-isomorphic, single-minded marekts.
 # generate_and_save_all_non_iso_markets()
 
 # generate_and_save_all_sm_markets()
+
+complete_markets_with_sm_values(2, [k for k in range(1, 10 + 1)], f"1_to_{10}")

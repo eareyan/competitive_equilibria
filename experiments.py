@@ -59,7 +59,7 @@ def create_sm_market_from_df(row):
 def write_experiment_results(total, up_to_value):
     print(f"Summarizing statistics for single-minded market with {total} vertices and values 1_to_{up_to_value}")
     # Read all the single-minded markets.
-    sm_markets = pd.read_csv(f"all_sm_markets/values_1_to_{up_to_value}/sm_market_{total}_values_1_to_{up_to_value}.gzip", compression='gzip')
+    sm_markets = pd.read_csv(f"all_sm_markets/values_1_to_{up_to_value}/sm_market_{total}_values_1_to_{up_to_value}.gz", compression='gzip')
 
     # Keep counts of the markets that clear and that don't clear
     clear_with_linear_prices = 0
