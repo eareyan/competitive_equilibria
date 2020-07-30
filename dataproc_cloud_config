@@ -1,0 +1,57 @@
+PROJECT=temporal-falcon-284913
+BUCKET_NAME=sm_experiments
+CLUSTER=smexpcluster
+REGION=us-east4
+
+## Zip project files
+zip sm_project_exp.zip bidders.py experiments_pyspark.py market_constituents.py market.py
+
+
+## To Create a cluster. 
+
+gcloud dataproc clusters create ${CLUSTER} \
+    --project=${PROJECT} \
+    --region=${REGION} \
+    --image-version=1.5 \
+    --single-node \
+    --metadata 'PIP_PACKAGES=PuLP==2.2 prettytable==0.7.2' \
+    --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh
+
+
+# To run an expriment on the cluster. The relevant python files must be in gs://${BUCKET_NAME}/sm_project_exp.zip
+# And the entry point must be in gs://${BUCKET_NAME}/experiments_pyspark.py
+
+gcloud dataproc jobs submit pyspark gs://${BUCKET_NAME}/experiments_pyspark.py \
+    --cluster=${CLUSTER} \
+    --project=${PROJECT} \
+    --region=${REGION} \
+    --py-files gs://${BUCKET_NAME}/sm_project_exp.zip \
+    -- 5 gs://${BUCKET_NAME}/ gs://${BUCKET_NAME}/
+
+
+######### Other stuff ###############
+
+https://stackoverflow.com/questions/61386462/submit-a-python-project-to-dataproc-job
+https://cloud.google.com/sdk/gcloud/reference/dataproc/jobs/submit/pyspark#--py-files
+https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/init-actions#gcloud-command
+https://github.com/GoogleCloudDataproc/initialization-actions/tree/master/python
+https://cloud.google.com/dataproc/docs/tutorials/gcs-connector-spark-tutorial#python
+
+image 1.5 is the right one
+
+gcloud dataproc clusters create ${CLUSTER} \
+    --project=${PROJECT} \
+    --region=${REGION} \
+    --image-version=1.5 \
+    --single-node
+
+gcloud dataproc clusters create ${CLUSTER_NAME} \
+    --region ${REGION} \
+    --metadata 'CONDA_PACKAGES=scipy' \
+    --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/conda-install.sh
+
+
+gcloud dataproc clusters create ${CLUSTER_NAME} \
+    --region ${REGION} \
+    --metadata 'PIP_PACKAGES=pandas==0.23.0 scipy==1.1.0' \
+    --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh    
