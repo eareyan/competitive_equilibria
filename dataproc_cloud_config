@@ -1,3 +1,5 @@
+## Cluster configuration variables
+
 PROJECT=temporal-falcon-284913
 BUCKET_NAME=sm_experiments
 CLUSTER=smexpcluster
@@ -6,8 +8,7 @@ REGION=us-east4
 ## Zip project files
 zip sm_project_exp.zip bidders.py experiments_pyspark.py market_constituents.py market.py
 
-
-## To Create a cluster. 
+## To Create a cluster with a single node. Usually for debugging purposes.
 
 gcloud dataproc clusters create ${CLUSTER} \
     --project=${PROJECT} \
@@ -17,16 +18,25 @@ gcloud dataproc clusters create ${CLUSTER} \
     --metadata 'PIP_PACKAGES=PuLP==2.2 prettytable==0.7.2' \
     --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh
 
+## To Create a cluster with a multiple workers.
 
-# To run an expriment on the cluster. The relevant python files must be in gs://${BUCKET_NAME}/sm_project_exp.zip
-# And the entry point must be in gs://${BUCKET_NAME}/experiments_pyspark.py
-
-gcloud dataproc jobs submit pyspark gs://${BUCKET_NAME}/experiments_pyspark.py \
-    --cluster=${CLUSTER} \
+gcloud dataproc clusters create ${CLUSTER} \
     --project=${PROJECT} \
     --region=${REGION} \
-    --py-files gs://${BUCKET_NAME}/sm_project_exp.zip \
-    -- 5 gs://${BUCKET_NAME}/ gs://${BUCKET_NAME}/
+    --image-version=1.5 \
+    --num-workers=3 \
+    --metadata 'PIP_PACKAGES=PuLP==2.2 prettytable==0.7.2 PTable==0.9.2' \
+    --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh
+
+# To run an experiment on the cluster. The relevant python files must be in gs://${BUCKET_NAME}/sm_project_exp.zip
+# And the entry point must be in gs://${BUCKET_NAME}/experiments_pyspark.py
+
+	gcloud dataproc jobs submit pyspark gs://${BUCKET_NAME}/experiments_pyspark.py \
+	    --cluster=${CLUSTER} \
+	    --project=${PROJECT} \
+	    --region=${REGION} \
+	    --py-files gs://${BUCKET_NAME}/sm_project_exp.zip \
+	    -- 8 gs://${BUCKET_NAME}/ gs://${BUCKET_NAME}/
 
 
 ######### Other stuff ###############

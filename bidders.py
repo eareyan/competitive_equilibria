@@ -146,6 +146,7 @@ class SingleMinded(Bidder):
         """
         Setter.
         :param value: the bidder's value
+        :param safe_check: boolean, should we check the value was already set?
         """
         if safe_check and self._value is not None:
             raise Exception("The value can only be set once. ")

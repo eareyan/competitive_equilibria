@@ -1,3 +1,4 @@
+from prettytable import PrettyTable
 from market import Market
 from market_constituents import Good
 from bidders import SingleMinded
@@ -23,13 +24,13 @@ def check_ce(sm_market):
 def does_market_clear(*args):
     """ Receives a market in the form of a row of a .csv file and returns a tuple
     (clears_linear, clears_non_linear) where each member of the tuple is 0/1 indicating the event. """
-    INDEX_INDEX = 0
+    # INDEX_INDEX = 0
     NUM_BIDDERS_INDEX = 1
     NUM_GOODS_INDEX = 2
 
     # At each 1000 market, print some debug info. This only makes logical sense when the processing is sequential.
-    if int(args[INDEX_INDEX]) % 1000 == 0:
-        print(f"market #{args[INDEX_INDEX]}")
+    # if int(args[INDEX_INDEX]) % 1000 == 0:
+    #     print(f"market #{args[INDEX_INDEX]}")
 
     # Cast number of bidders and number of goods as integers.
     # print(f"args = {args}")
@@ -60,7 +61,7 @@ def does_market_clear(*args):
     return linear_clear, non_linear_clear
 
 
-def run_experiment(total, input_path, output_path):
+def run_experiment(total: int, input_path: str, output_path: str, number_of_partitions: int):
     # Run the pyspark experiment with the following parameters.
     sm_market_input_gz_loc = f"{input_path}sm_market_{total}_values_1_to_10.gz"
     sm_market_output_parquet_loc = f"{output_path}markets_{total}.parquet"
@@ -73,8 +74,8 @@ def run_experiment(total, input_path, output_path):
     df = spark.read.csv(sm_market_input_gz_loc, header=True)
     print(f"default number of partitions = {df.rdd.getNumPartitions()}")
 
-    # TODO the number of partitions are fixed. How to make this number dynamic based on the input data?
-    df = df.repartition(100)
+    # Set the number of partitions.
+    df = df.coalesce(number_of_partitions)
     print(f"new number of partitions = {df.rdd.getNumPartitions()}")
 
     # Create and register a udf to compute clearing prices.
@@ -99,18 +100,35 @@ def run_experiment(total, input_path, output_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 1 and len(sys.argv) != 4:
-        raise Exception("Either 0 or 3 command line arguments are accepted")
+    if len(sys.argv) != 1 and len(sys.argv) != 6:
+        raise Exception("Either 0 or 5 command line arguments are accepted")
     # Run the experiment with a default total of a total given by the user's parameter.
     if len(sys.argv) == 1:
-        the_total = 7
+        the_total = 2
         the_input_path = 'all_sm_markets/values_1_to_10/'
         the_output_path = 'experiments_results/'
+        the_number_of_partitions = 1
     else:
         the_total = int(sys.argv[1])
         the_input_path = sys.argv[2]
         the_output_path = sys.argv[3]
-    print(f"Run experiment with total = {the_total}, input_path = {the_input_path}, output_path = {the_output_path}")
+        the_number_of_workers = int(sys.argv[4])
+        the_number_of_cpus_per_worker = int(sys.argv[5])
+        # See the following URL for how to set the number of partitions in a cluster: https://medium.com/@adrianchang/apache-spark-partitioning-e9faab369d14
+        the_number_of_partitions = the_number_of_workers * the_number_of_cpus_per_worker * 4
+
+    # Print the experiment configuration.
+    experiment_config_ptable = PrettyTable()
+    experiment_config_ptable.title = 'Experiment configuration'
+    experiment_config_ptable.field_names = ['configuration', 'value']
+    experiment_config_ptable.add_row(['total', the_total])
+    experiment_config_ptable.add_row(['input_path', the_input_path])
+    experiment_config_ptable.add_row(['output_path', the_output_path])
+    experiment_config_ptable.add_row(['number_of_partitions', the_number_of_partitions])
+    print(experiment_config_ptable)
+
+    # Run the experiment
     run_experiment(total=the_total,
                    input_path=the_input_path,
-                   output_path=the_output_path)
+                   output_path=the_output_path,
+                   number_of_partitions=the_number_of_partitions)
