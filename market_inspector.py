@@ -33,8 +33,11 @@ class MarketInspector:
         pricing_stats_table = PrettyTable()
         pricing_stats_table.title = 'Pricing'
         pricing_stats_table.field_names = ['Bundle', 'Price']
-        for good, price in result['output_prices'].items():
-            pricing_stats_table.add_row([good, price])
+        if result['status'] != 'Infeasible':
+            for elem in result['output_prices']:
+                if elem is not None:
+                    for k, v in elem.items():
+                        pricing_stats_table.add_row([k, v.varValue])
         pricing_stats_table.add_row(['Status', result['status']])
         return pricing_stats_table
 

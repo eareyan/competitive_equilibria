@@ -1,11 +1,23 @@
+from pyspark import SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import udf, explode
+from pyspark.sql.types import StructType, StructField, ArrayType, StringType, IntegerType
+from bidders import SingleMinded
 from market import Market
 from market_constituents import Good
-from bidders import SingleMinded
-from os import path
+from typing import List
 import itertools as it
-import pandas as pd
-import time
-import gzip
+
+# Columns of the non_iso_bipartite_graphs files.
+LEN_BIG_PARTITION = 0
+LEN_SMALL_PARTITION = 1
+BIG_PARTITION = 2
+SMALL_PARTITION = 3
+EDGES = 4
+
+# Columns of the non_iso_market files.
+NUM_BIDDERS_INDEX = 0
+NUM_GOODS_INDEX = 1
 
 
 def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
@@ -37,135 +49,151 @@ def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
     return Market(setOfGoods, setOfBidders)
 
 
-def save_non_iso_markets(num_vertices):
-    t0 = time.time()
-
-    # All that follows is w.r.t single-minded valuations and a fixed set of values bidders can have.
-    LEN_BIG_PARTITION = 1
-    LEN_SMALL_PARTITION = 2
-    BIG_PARTITION = 3
-    SMALL_PARTITION = 4
-    EDGES = 5
-
-    # For each non-isomorphic graph G.
-    non_iso_graphs = pd.read_csv(f"non_iso_bipartite_graphs/non_isomorphic_bipartite_connected_vertices_{num_vertices}.gz", compression='gzip')
-    list_data_frame = []
-    for row in non_iso_graphs.itertuples():
-        markets = []
-        # print(f"#{counter}")
-        # print(row[LEN_BIG_PARTITION], row[LEN_SMALL_PARTITION], row[BIG_PARTITION], row[SMALL_PARTITION], row[EDGES])
-        sm_market = create_sm_market_from_graph(row[BIG_PARTITION], row[SMALL_PARTITION], row[EDGES])
-        markets += [sm_market]
-        # Check if its horizontal reflection H(G) is "market equivalent" to G.
-        # If it is not, then consider H(G) and G in what follows. Otherwise, consider only G.
-        if not SingleMinded.is_sm_market_hor_reflect_equiv(sm_market):
-            # The reflected market is not equivalent to the original market, hence, a valid reflection.
-            sm_market_reflected = create_sm_market_from_graph(row[SMALL_PARTITION], row[BIG_PARTITION], row[EDGES])
-            markets += [sm_market_reflected]
-        for market in markets:
-            data_frame_row = SingleMinded.get_data_frame_row(market)
-            # print(SingleMinded.get_pretty_representation(market))
-            # print(data_frame_row)
-            list_data_frame += data_frame_row
-    data_frame = pd.DataFrame(list_data_frame)
-    data_frame.columns = ['num_bidders', 'num_goods'] + [f"bidder_{i}" for i in range(0, len(data_frame.columns) - 2)]
-    data_frame.to_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gz", index=False, compression='gzip')
-    print(f"it took {time.time() - t0} sec")
-
-
-def complete_markets_with_sm_values(num_vertices, support_values, values_file_str):
+def generate_market(*args):
     """
-    Complete graphs with values. Uses multiset for bidders' values to avoid symmetries for values.
+    This function is called by
     """
-    NUM_BIDDERS_INDEX = 1
-    NUM_GOODS_INDEX = 2
-
-    non_iso_markets = pd.read_csv(f"non_iso_markets/non_iso_markets_vertices_{num_vertices}.gz", compression='gzip')
-    print(f"\n Computing single-minded markets, {num_vertices} vertices (total of {len(non_iso_markets)} markets) for values {values_file_str}")
-    if path.exists(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gz"):
-        print(f" \t already in disk")
-        return
-
-    t0 = time.time()
-    # Create a gzip file.
-    the_file = gzip.open(f"all_sm_markets/values_{values_file_str}/sm_market_{num_vertices}_values_{values_file_str}.gz", 'ab')
-    # Write the header of the gzip file.
-    the_file.write("index,num_bidders,num_goods,".encode("utf-8") +
-                   ','.join([f"col_{i}" for i in range(0, (num_vertices - 1) * 2)]).encode("utf-8") +
-                   '\n'.encode("utf-8"))
-    total_non_iso_markets = 0
-    total_non_iso_markets_with_value = 0
-    # For each possible non_iso market, complete with value and save the resulting single-minded market to the gzip file.
-    for row in non_iso_markets.itertuples():
-        # First, from the csv file create a single-minded market.
-        total_non_iso_markets += 1
-        print(f"\r {(total_non_iso_markets / len(non_iso_markets)) * 100 : .2f} %", end='')
-        num_bidders = row[NUM_BIDDERS_INDEX]
-        num_goods = row[NUM_GOODS_INDEX]
-        listOfGoods = [Good(i) for i in range(0, num_goods)]
-        setOfGoods = set(listOfGoods)
-        setOfBidders = set()
-        for i in range(1, num_bidders + 1):
-            bidder_demand_vector = eval(row[NUM_GOODS_INDEX + i])
-            sm_bidder = SingleMinded(i - 1, setOfGoods, random_init=False)
-            sm_bidder.set_preferred_bundle({listOfGoods[j] for j in range(0, num_goods) if bidder_demand_vector[j] == 1})
-            setOfBidders.add(sm_bidder)
-        # Compute the single-minded market equivalence classes.
-        sm_market = Market(setOfGoods, setOfBidders)
-        equivalence_classes = SingleMinded.compute_bidders_equivalence_classes(sm_market)
-        # Now, complete the market with values using multiset for bidders in the same equivalence class.
-        for value_assignment in it.product(*[it.combinations_with_replacement(support_values, len(equivalence_class)) for equivalence_class in equivalence_classes]):
-            k = 0
-            for bidder_class in equivalence_classes:
-                for t, bidder in enumerate(bidder_class):
-                    bidder.set_value(value_assignment[k][t], safe_check=False)
-                k += 1
-            the_file.write((str(total_non_iso_markets_with_value) + ",").encode("utf-8") +
-                           str(SingleMinded.get_csv_row(sm_market)).encode("utf-8") +
-                           '\n'.encode("utf-8"))
-            total_non_iso_markets_with_value += 1
-
-    print(f" Done, it took {time.time() - t0} sec")
-    the_file.close()
+    sm_market = create_sm_market_from_graph(args[BIG_PARTITION], args[SMALL_PARTITION], args[EDGES])
+    return_markets = [SingleMinded.get_market_as_list(sm_market)]
+    if not SingleMinded.is_sm_market_hor_reflect_equiv(sm_market):
+        # The reflected market is not equivalent to the original market, hence, a valid reflection.
+        return_markets += [SingleMinded.get_market_as_list(create_sm_market_from_graph(args[SMALL_PARTITION], args[BIG_PARTITION], args[EDGES]))]
+    return return_markets
 
 
-def generate_and_save_all_non_iso_markets():
-    # From the non-iso bipartite graphs, generate all non-iso markets.
-    for i in range(2, 11):
-        save_non_iso_markets(i)
+def generate_and_save_non_iso_markets(total, spark_session, input_graphs_loc, output_markets_loc):
+    """
+    Given the total number of vertices of the underlying bipartite, connected graph, generate all possible
+    markets (sans bidders values for bundles). Saves the markets in parquet files.
+    """
+
+    # Create a custom return type the udf function generate_sm_market.
+    schema = ArrayType(StructType([StructField("num_bidders", IntegerType(), False), StructField("num_goods", IntegerType(), False)] +
+                                  [StructField(f"bidder_{i}", StringType(), False) for i in range(0, total - 1)]))
+    # Register the udf function.
+    udf_generate_markets = udf(generate_market, schema)
+
+    # Read in the non isomorphic, bipartite connected graphs of the given size.
+    sm_market_input_gz_loc = f"{input_graphs_loc}non_isomorphic_bipartite_connected_vertices_{total}.gz"
+    df = spark_session.read.csv(sm_market_input_gz_loc, header=True)
+
+    # Apply the udf function generate_sm_market.
+    df = df.withColumn('non_iso_markets', udf_generate_markets(*['len_big_partition',
+                                                                 'len_small_partition',
+                                                                 'big_partition',
+                                                                 'small_partition',
+                                                                 'edges']))
+    # Select the columns and save the data.
+    df = df.select(explode(df.non_iso_markets)).select('col.*')
+    df.printSchema()
+    df.write.mode('overwrite').parquet(f"{output_markets_loc}non_iso_markets_vertices_{total}.parquet")
 
 
-def generate_and_save_all_sm_markets():
-    # Generate all single-minded markets we can!
-    # for t in range(2, 11):
-    for t in range(10, 11):
-        values = [k for k in range(1, t + 1)]
-        for i in range(2, 11):
-            complete_markets_with_sm_values(i, values, f"1_to_{t}")
+def generate_market_values(*args, support_values: List[int] = None):
+    """
+
+    """
+    # Build the market.
+    num_bidders = int(args[NUM_BIDDERS_INDEX])
+    num_goods = int(args[NUM_GOODS_INDEX])
+    listOfGoods = [Good(i) for i in range(0, num_goods)]
+    setOfGoods = set(listOfGoods)
+    setOfBidders = set()
+    for i in range(1, num_bidders + 1):
+        bidder_demand_vector = eval(args[NUM_GOODS_INDEX + i])
+        sm_bidder = SingleMinded(i - 1, setOfGoods, random_init=False)
+        sm_bidder.set_preferred_bundle({listOfGoods[j] for j in range(0, num_goods) if bidder_demand_vector[j] == 1})
+        setOfBidders.add(sm_bidder)
+
+    # Compute the single-minded market equivalence classes.
+    sm_market = Market(setOfGoods, setOfBidders)
+    equivalence_classes = SingleMinded.compute_bidders_equivalence_classes(sm_market)
+
+    # Complete the market with values, where bidders in the same equivalence class receive values from a multi-set.
+    return_markets = []
+    for value_assignment in it.product(*[it.combinations_with_replacement(support_values, len(equivalence_class)) for equivalence_class in equivalence_classes]):
+        k = 0
+        for bidder_class in equivalence_classes:
+            for t, bidder in enumerate(bidder_class):
+                bidder.set_value(value_assignment[k][t], safe_check=False)
+            k += 1
+        return_markets += [SingleMinded.get_market_as_list(sm_market, include_values=True)]
+    return return_markets
 
 
-"""
-Pipeline for generating non-isomorphic, single-minded marekts.
-    (1) Run generate_non_iso_bipartite_graphs.py (see instructions there).
-        This will generate all non-isomorphic, connected, bipartite graphs. 
-        These graphs are saved as .csv files in folder non_iso_bipartite_graphs/
-    (2) Run the following functions from this file in the given order:
-        (2.1)  generate_and_save_all_non_iso_markets()
-                This will generate all non-isomorphic single-minded markets but with no values.
-                For each market in folder non_iso_bipartite_graphs/, saves a market in folder non_iso_markets/
-                All these markets will be saved as .csv files.
-        (2.2) generate_and_save_all_sm_markets()
-                This will complete the non-isomorphic markets by adding values to bidders.
-                For each market in folder non_iso_markets/, saves markets in folder all_sm_markets/
-    Summary of input output .csv files:
-        generate_non_iso_bipartite_graphs.py -> non_iso_bipartite_graphs/ 
-        non_iso_bipartite_graphs/ -> generate_and_save_all_non_iso_markets() -> non_iso_markets/
-        non_iso_markets/ -> generate_and_save_all_sm_markets() -> all_sm_markets/
-    
-    Markets in folder all_sm_markets/ are meant to be ready to experiment with, see experiments.py.  
-"""
-# generate_and_save_all_non_iso_markets()
+def complete_markets_with_values(num_vertices, support_values, spark_session, input_markets_loc, output_markets_loc):
+    """
+    Completes markets with values for bidders, i.e., values for their preferred bundles.
+    """
+    schema = ArrayType(StructType([StructField("num_bidders", IntegerType(), False), StructField("num_goods", IntegerType(), False)] +
+                                  [StructField(f"col_{i}", StringType(), False) for i in range(0, 2 * (num_vertices - 1))]))
 
-# generate_and_save_all_sm_markets()
+    # Register the udf. Here, we fix the support value list.
+    udf_generate_markets_values = udf(lambda *args: generate_market_values(*args, support_values=support_values), schema)
 
-complete_markets_with_sm_values(2, [k for k in range(1, 10 + 1)], f"1_to_{10}")
+    # Read the non-iso markets to complete them with values.
+    df = spark_session.read.parquet(f"{input_markets_loc}/non_iso_markets_vertices_{num_vertices}.parquet")
+
+    # Apply the udf function udf_generate_markets_values. Notice the starred expression to send the data frame column names.
+    df = df.withColumn('non_iso_markets', udf_generate_markets_values(*['num_bidders',
+                                                                        'num_goods',
+                                                                        *[f"bidder_{i}" for i in range(0, num_vertices - 1)]]))
+
+    # Select the columns and save the data.
+    df = df.select(explode(df.non_iso_markets)).select('col.*')
+    df.printSchema()
+    df.write.mode('overwrite').parquet(f"{output_markets_loc}sm_market_{num_vertices}.parquet")
+
+
+def generate_and_save_all_non_iso_markets(spark_session):
+    for total_num_vertices in range(2, 9):
+        generate_and_save_non_iso_markets(total=total_num_vertices,
+                                          spark_session=spark_session,
+                                          input_graphs_loc='non_iso_bipartite_graphs/',
+                                          output_markets_loc='non_iso_markets/')
+
+
+def generate_and_save_all_sm_markets(spark_session):
+    # Generating markets where bidders have values 1, ..., max_value.
+    max_value = 10
+    for total_num_vertices in range(2, 9):
+        complete_markets_with_values(num_vertices=total_num_vertices,
+                                     support_values=[i for i in range(1, max_value + 1)],
+                                     spark_session=spark_session,
+                                     input_markets_loc='non_iso_markets/',
+                                     output_markets_loc=f"all_sm_markets/values_1_to_{max_value}/")
+
+
+if __name__ == '__main__':
+    """
+    Pipeline for generating non-isomorphic, single-minded markets.
+        
+        (1) Run generate_non_iso_bipartite_graphs.py (see instructions there).
+            This will generate all non-isomorphic, connected, bipartite graphs. 
+            These graphs are saved as .csv files in folder non_iso_bipartite_graphs/
+        
+        (2) Run the following functions from this file in the given order:
+            (2.1)  generate_and_save_all_non_iso_markets()
+                    This will generate all non-isomorphic single-minded markets but with no values.
+                    For each market in folder non_iso_bipartite_graphs/, saves a market in folder non_iso_markets/
+                    All these markets will be saved as parquet files.
+            (2.2) generate_and_save_all_sm_markets()
+                    This will complete the non-isomorphic markets by adding values to bidders.
+                    For each market in folder non_iso_markets/, saves markets in folder all_sm_markets/
+        
+        Summary of input output .csv files:
+            generate_non_iso_bipartite_graphs.py -> non_iso_bipartite_graphs/ 
+            non_iso_bipartite_graphs/ -> generate_and_save_all_non_iso_markets() -> non_iso_markets/
+            non_iso_markets/ -> generate_and_save_all_sm_markets() -> all_sm_markets/
+
+        Markets in folder all_sm_markets/ are meant to be ready to experiment with, see experiments.py.  
+    """
+    # Generate spark context and session.
+    the_sc = SparkContext()
+    the_spark_session = SparkSession(the_sc)
+
+    # Generate and save all non-isomorphic markets.
+    # generate_and_save_all_non_iso_markets(the_spark_session)
+
+    # Completing non-iso markets with values.
+    generate_and_save_all_sm_markets(the_spark_session)

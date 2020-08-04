@@ -1,7 +1,7 @@
 import pulp
 import time
 import itertools as it
-from typing import Set, Dict, Tuple
+from typing import Set, Dict, Tuple, List
 from market_constituents import Good, Bidder
 
 
@@ -194,104 +194,69 @@ class Market:
         # Return the optimal welfare together with the allocation that attains it.
         return max_welfare, argmax_allocation
 
-    def linear_pricing(self, allocation: Dict[Bidder, Set[Good]]):
+    def get_bundle_prices(self, quadratic=False) -> Tuple[Dict[Set[Good], pulp.LpAffineExpression], List[Dict[str, pulp.LpVariable]]]:
         """
-        Attempts to compute a utility-maximizing pricing that couples with the given allocation.
-        :return: a dictionary with info about the solver and the pricing, if it exists
+        Returns a map from bundle to pulp affine expressions that define the price of the bundle.
+        TODO more flexible pricing structures, beyond just linear and quadratic.
+        :return: Dict[Set[Good], pulp.LpAffineExpression]
         """
-        # Collect results and start timer for profiling purposes.
-        result = {}
-        t0_initial = time.time()
-
         # Generate variables, per-good-prices.
-        prices = pulp.LpVariable.dicts('p', (good for good in self._goods), lowBound=0.0)
+        linear_prices = pulp.LpVariable.dicts('p', (good for good in self._goods), lowBound=0.0)
+        quadra_prices = None
+        if quadratic:
+            # Generate variables, per-pair-good-prices.
+            quadra_prices = pulp.LpVariable.dicts('p', list(it.combinations(self._goods, 2)), lowBound=0.0)
 
-        # Generate the pulp problem.
-        model = pulp.LpProblem('Pricing_Problem', pulp.LpMaximize)
+        # Generate a map from bundle -> price of bundle. For now, the price of a bundle is linear or linear plus quadratic.
+        enumerated_bundle: Tuple[int, Set[Good]]
+        map_bundle_to_price: Dict[Set[Good], pulp.LpAffineExpression] = {}
+        for enumerated_bundle in self.get_all_enumerated_bundles():
+            lp_linear_prices = pulp.lpSum([linear_prices[good] for good in enumerated_bundle[1]])
+            if quadratic:
+                lp_quadra_prices = pulp.lpSum([quadra_prices[pair] for pair in it.combinations(enumerated_bundle[1], 2)])
+                map_bundle_to_price[enumerated_bundle[1]] = lp_linear_prices + lp_quadra_prices
+            else:
+                map_bundle_to_price[enumerated_bundle[1]] = lp_linear_prices
 
-        # Generate utility-maximization constraints for each bidder.
-        for bidder in self._bidders:
-            value_for_allocated_bundle = bidder.value_query(allocation[bidder]) if bidder in allocation else 0.0
-            cost_for_allocated_bundle = pulp.lpSum([prices[good] for good in allocation[bidder]]) if bidder in allocation else 0.0
+        return map_bundle_to_price, [linear_prices, quadra_prices]
 
-            # Generate utility-maximization for this bidder.
-            # An enumerated bundle is a tuple (int, bundle) where int is a unique integer in the range 0...2^n
-            enumerated_bundle: Tuple[int, Set[Good]]
-            for enumerated_bundle in self.get_all_enumerated_bundles():
-                value_of_bundle = bidder.value_query(enumerated_bundle[1])
-                cost_of_bundle = pulp.lpSum([prices[good] for good in enumerated_bundle[1]])
-                model += value_of_bundle - cost_of_bundle <= value_for_allocated_bundle - cost_for_allocated_bundle
-
-        # Generate constraints on goods: if a good is not allocated, its price is 0.
-        # First, compute the union of all goods in the allocation.
-        allocated_goods = set()
-        for bidder_alloc in allocation.values():
-            allocated_goods = allocated_goods.union({good for good in bidder_alloc})
-        # For each good in the market, check if the good was part of the allocation. If not, set its price to 0.
-        for good in self._goods:
-            if good not in allocated_goods:
-                model += prices[good] == 0.0
-
-        result['time_to_generate_lp'] = time.time() - t0_initial
-
-        # Solve the LP.
-        t0 = time.time()
-        model.solve(pulp.PULP_CBC_CMD(msg=False))
-        result['time_to_solve_lp'] = time.time() - t0
-
-        # Check the status of the model. Is it feasible?
-        result['status'] = pulp.LpStatus[model.status]
-
-        output_prices = {}
-        if result['status'] != 'Infeasible':
-            # If the model is feasible, get the prices.
-            for good in self._goods:
-                output_prices[good] = prices[good].varValue
-        result['output_prices'] = output_prices
-
-        return result
-
-    def non_linear_pricing(self, allocation: Dict[Bidder, Set[Good]]):
+    def pricing(self, allocation: Dict[Bidder, Set[Good]], quadratic=False):
         """
-
-        :param allocation:
+        Solve the competitive equilibria pricing LP.
+        :param allocation: a dictionary mapping a bidder to a set of goods. If the bidder is not in the map, it was not in the allocation.
+        :param quadratic:
         :return:
         """
         # Collect results and start timer for profiling purposes.
         result = {}
         t0_initial = time.time()
 
-        # Generate the pulp problem.
-        model = pulp.LpProblem('Quadratic_Pricing_Problem', pulp.LpMaximize)
+        # Generate the pulp problem. The problem is to find a CE pricing that maximizes revenue.
+        model = pulp.LpProblem('Pricing_Problem', pulp.LpMaximize)
 
-        # Generate variables, per-good-prices.
-        linear_prices = pulp.LpVariable.dicts('p', (good for good in self._goods), lowBound=0.0)
-        # Generate variables, per-pair-good-prices.
-        quadra_prices = pulp.LpVariable.dicts('p', list(it.combinations(self._goods, 2)), lowBound=0.0)
+        # Get the prices for bundles.
+        map_bundle_to_price: Dict[Set[Good], pulp.LpAffineExpression]
+        list_of_prices_vars: List[Dict[str, pulp.LpVariable]]
+        map_bundle_to_price, list_of_prices_vars = self.get_bundle_prices(quadratic)
 
-        # Generate a map from bundle -> cost of bundle. For now, cost is linear plus quadratic prices.
-        # TODO more flexible pricing structures, beyond quadratic
+        # (1) Generate utility-maximization constraint for bidders.
         enumerated_bundle: Tuple[int, Set[Good]]
-        map_bundle_to_price = {}
-        for enumerated_bundle in self.get_all_enumerated_bundles():
-            lp_linear_prices = pulp.lpSum([linear_prices[good] for good in enumerated_bundle[1]])
-            lp_quadra_prices = pulp.lpSum([quadra_prices[pair] for pair in it.combinations(enumerated_bundle[1], 2)])
-            map_bundle_to_price[enumerated_bundle[1]] = lp_linear_prices + lp_quadra_prices
-
-        # Generate utility-maximization constraint.
         for bidder in self._bidders:
             value_for_allocated_bundle = bidder.value_query(allocation[bidder]) if bidder in allocation else 0.0
-            cost_for_allocated_bundle = map_bundle_to_price[allocation[bidder]] if bidder in allocation else 0.0
+            price_for_allocated_bundle = map_bundle_to_price[allocation[bidder]] if bidder in allocation else 0.0
             # Generate utility-maximization for this bidder.
             # An enumerated bundle is a tuple (int, bundle) where int is a unique integer in the range 0...2^n
-            enumerated_bundle: Tuple[int, Set[Good]]
             for enumerated_bundle in self.get_all_enumerated_bundles():
                 value_of_bundle = bidder.value_query(enumerated_bundle[1])
-                cost_of_bundle = map_bundle_to_price[enumerated_bundle[1]]
-                model += value_of_bundle - cost_of_bundle <= value_for_allocated_bundle - cost_for_allocated_bundle
+                price_of_bundle = map_bundle_to_price[enumerated_bundle[1]]
+                model += value_of_bundle - price_of_bundle <= value_for_allocated_bundle - price_for_allocated_bundle
 
-        # Generate revenue-maximization constraints, i.e., the revenue of the allocation must be greater than any other allocation.
-        # TODO the way these constraints are generated can be optimized, as there are currently lots of redundant constraints
+        # (2) Generate revenue-maximization constraints for auctioneer, i.e., the revenue of the allocation must be greater than any other allocation.
+        revenue = pulp.lpSum([map_bundle_to_price[bidder_alloc] for bidder_alloc in allocation.values()])
+        for allocation in self.enumerate_all_allocations():
+            model += revenue >= pulp.lpSum([map_bundle_to_price[bundle] for bundle in allocation.values()])
+
+        # TODO the way the revenue constraints are generated can be optimized, as there are currently lots of redundant constraints
         """ 
         For example
             Allocation
@@ -303,10 +268,7 @@ class Market:
                 {Bidder #0: (Good #0, Good #1, Good #2), Bidder #1: (), Bidder #2: ()}
             Dealing with symmetry should help a lot here... 
         """
-        revenue = pulp.lpSum([map_bundle_to_price[bidder_alloc] for bidder_alloc in allocation.values()])
-        for allocation in self.enumerate_all_allocations():
-            model += revenue >= pulp.lpSum([map_bundle_to_price[bundle] for bundle in allocation.values()])
-
+        # Record time to generate the lp.
         result['time_to_generate_lp'] = time.time() - t0_initial
 
         # Solve the LP.
@@ -314,12 +276,8 @@ class Market:
         model.solve(pulp.PULP_CBC_CMD(msg=False))
         result['time_to_solve_lp'] = time.time() - t0
 
-        # Get the prices.
-        result['output_prices'] = {}
-        for good in self._goods:
-            result['output_prices'][good] = linear_prices[good].varValue
-        for pair in list(it.combinations(self._goods, 2)):
-            result['output_prices'][pair] = quadra_prices[pair].varValue
+        # Return the prices variables.
+        result['output_prices'] = list_of_prices_vars
 
         # Check the status of the model. Is it feasible?
         result['status'] = pulp.LpStatus[model.status]

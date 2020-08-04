@@ -12,9 +12,12 @@ exec(open('/home/data/generate_non_iso_bipartite_graphs.py').read())
 """
 import subprocess
 import sys
-import pandas as pd
 
 subprocess.check_call([sys.executable, "-m", "pip", "install", "pandas"])
+
+import math
+import pandas as pd
+import time
 
 
 def enumerate_all_non_iso_bipartite(total_num_vertices: int):
@@ -25,7 +28,11 @@ def enumerate_all_non_iso_bipartite(total_num_vertices: int):
     """
     count = 0
     market_data = []
-    for num_edges in range(0, total_num_vertices + 1):
+    # We try to include as many edges as possible.
+    k = math.ceil(total_num_vertices / 2) * math.floor(total_num_vertices / 2) if total_num_vertices % 2 == 1 else int(total_num_vertices / 2) * int(total_num_vertices / 2)
+    t0 = time.time()
+    for num_edges in range(0, k + 1):
+        print(f"Getting markets with {num_edges} many edges")
         # Here is where the magic happens. Sagemath's (https://www.sagemath.org/) function hypergraphs.nauty
         # calls the nauty's library (http://pallini.di.uniroma1.it/) which enumerate's all hypergraphs.
         # The option uniform = 2 guarantees we only enumerate graphs (edges are between two vertices).
@@ -53,10 +60,10 @@ def enumerate_all_non_iso_bipartite(total_num_vertices: int):
                                                            'big_partition',
                                                            'small_partition',
                                                            'edges'])
-    market_data_frame.to_csv(f"/home/data/non_isomorphic_bipartite_connected_vertices_{total_num_vertices}.gzip",
+    market_data_frame.to_csv(f"/home/data/non_isomorphic_bipartite_connected_vertices_{total_num_vertices}.gz",
                              index=False,
                              compression='gzip')
-    print(f"a total of {count} non_iso, connected, bipartite")
+    print(f"a total of {count} non_iso, connected, bipartite, it took {time.time() - t0} sec")
 
 
 print("Loaded: enumerate_all_non_iso_bipartite")

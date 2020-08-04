@@ -70,8 +70,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_welfare_max_ilp_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the ilp. """
-        setOfGoods = {Good(i) for i in range(0, 15)}
-        setOfBidders = {bidders.AdditiveWithBudget(i, setOfGoods) for i in range(0, 15)}
+        setOfGoods = {Good(i) for i in range(0, 10)}
+        setOfBidders = {bidders.AdditiveWithBudget(i, setOfGoods) for i in range(0, 10)}
         market = Market(setOfGoods, setOfBidders)
         print(bidders.AdditiveWithBudget.get_pretty_representation(market))
 
@@ -171,8 +171,8 @@ class MyTestCase(unittest.TestCase):
         """ Testing the pricing lp for additive bidders. In this case, there should always be a utility-maximizing pricing. """
         for _ in range(0, 10):
             # Draw a random additive market
-            setOfGoods = {Good(i) for i in range(0, 7)}
-            setOfBidders = {bidders.Additive(i, setOfGoods) for i in range(0, 7)}
+            setOfGoods = {Good(i) for i in range(0, 2)}
+            setOfBidders = {bidders.Additive(i, setOfGoods) for i in range(0, 2)}
             simple_market = Market(setOfGoods, setOfBidders)
             print(bidders.Additive.get_pretty_representation(simple_market))
 
@@ -182,7 +182,7 @@ class MyTestCase(unittest.TestCase):
             print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
 
             # Solve for a utility-maximizing pricing.
-            pricing_result = simple_market.linear_pricing(welfare_max_result_ilp['optimal_allocation'])
+            pricing_result = simple_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
             print(MarketInspector.pretty_print_pricing(pricing_result))
             print(MarketInspector.pricing_stats_table(pricing_result))
 
@@ -207,7 +207,7 @@ class MyTestCase(unittest.TestCase):
             print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
 
             # Solve for a utility-maximizing pricing.
-            pricing_result = awb_market.linear_pricing(welfare_max_result_ilp['optimal_allocation'])
+            pricing_result = awb_market.pricing(welfare_max_result_ilp['optimal_allocation'])
             print(MarketInspector.pretty_print_pricing(pricing_result))
             print(MarketInspector.pricing_stats_table(pricing_result))
 
@@ -250,7 +250,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 10.0)
 
         # Try to compute non-linear CE prices.
-        pricing_result = sm_market.non_linear_pricing(welfare_max_result_ilp['optimal_allocation'])
+        pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
         print(MarketInspector.pretty_print_pricing(pricing_result))
 
     def test_additive_non_linear_pricing_lp(self):
@@ -266,7 +266,7 @@ class MyTestCase(unittest.TestCase):
         print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
 
         # Try to compute non-linear CE prices.
-        pricing_result = additive_market.non_linear_pricing(welfare_max_result_ilp['optimal_allocation'])
+        pricing_result = additive_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
         print(MarketInspector.pretty_print_pricing(pricing_result))
         print(MarketInspector.pricing_stats_table(pricing_result))
 

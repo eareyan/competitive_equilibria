@@ -5,7 +5,7 @@ from bidders import SingleMinded
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf
-from pyspark.sql.types import IntegerType, StructType, StructField
+from pyspark.sql.types import IntegerType, StructType, StructField, BooleanType
 import sys
 
 
@@ -14,23 +14,23 @@ def check_ce(sm_market):
     # Solve for the welfare-maximizing allocation.
     welfare_max_result_ilp = sm_market.welfare_max_program()
     # Try to compute linear CE prices.
-    pricing_result = sm_market.linear_pricing(welfare_max_result_ilp['optimal_allocation'])
+    linear_pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=False)
     # Try to compute non-linear CE prices.
-    non_linear_pricing_result = sm_market.non_linear_pricing(welfare_max_result_ilp['optimal_allocation'])
+    quadratic_pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
     # Report results.
-    return 1 if pricing_result['status'] == 'Optimal' else 0, 1 if non_linear_pricing_result['status'] == 'Optimal' else 0
+    return True if linear_pricing_result['status'] == 'Optimal' else False, True if quadratic_pricing_result['status'] == 'Optimal' else False
 
 
 def does_market_clear(*args):
     """ Receives a market in the form of a row of a .csv file and returns a tuple
     (clears_linear, clears_non_linear) where each member of the tuple is 0/1 indicating the event. """
-    # INDEX_INDEX = 0
+    INDEX_INDEX = 0
     NUM_BIDDERS_INDEX = 1
     NUM_GOODS_INDEX = 2
 
     # At each 1000 market, print some debug info. This only makes logical sense when the processing is sequential.
-    # if int(args[INDEX_INDEX]) % 1000 == 0:
-    #     print(f"market #{args[INDEX_INDEX]}")
+    if int(args[INDEX_INDEX]) % 1000 == 0:
+        print(f"market #{args[INDEX_INDEX]}")
 
     # Cast number of bidders and number of goods as integers.
     # print(f"args = {args}")
@@ -80,15 +80,15 @@ def run_experiment(total: int, input_path: str, output_path: str, number_of_part
 
     # Create and register a udf to compute clearing prices.
     schema = StructType([
-        StructField("linear", IntegerType(), False),
-        StructField("non_linear", IntegerType(), False)
+        StructField("linear_clears", BooleanType(), False),
+        StructField("quadratic_clears", BooleanType(), False)
     ])
     my_udf = udf(does_market_clear, schema)
 
     # Apply the UDF function.
     cols = ['index', 'num_bidders', 'num_goods'] + [f'col_{k}' for k in range(0, 2 * (total - 1))]
     df = df.withColumn('clearing', my_udf(*cols))
-    new_cols = cols + ['clearing.linear', 'clearing.non_linear']
+    new_cols = cols + ['clearing.linear_clears', 'clearing.quadratic_clears']
 
     # Write the results of the experiments.
     df = df.select(*new_cols)

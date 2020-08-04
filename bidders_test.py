@@ -4,6 +4,7 @@ import random
 from market import Market
 from market_constituents import Good
 from market_inspector import MarketInspector
+from typing import Dict
 
 
 class MyTestCase(unittest.TestCase):
@@ -139,3 +140,52 @@ class MyTestCase(unittest.TestCase):
         print('\n')
         for bidder in market_0.get_bidders():
             print(f"market_0: {bidder.get_preferred_bundle()}")
+
+    # Taken from http://www.slahaie.net/pubs/LahaieLu19.pdf, page 6 - 7
+    def test_non_existence_sm_example(self):
+        mapOfGoods = {i: Good(i) for i in range(0, 3)}
+        setOfGoods = set(mapOfGoods.values())
+        mapOfBidders: Dict[int, bidders.SingleMinded]
+        mapOfBidders = {i: bidders.SingleMinded(i, setOfGoods, random_init=False) for i in range(0, 4)}
+        setOfBidders = set(mapOfBidders.values())
+        mapOfBidders[0].set_preferred_bundle({mapOfGoods[0], mapOfGoods[1]})
+        mapOfBidders[1].set_preferred_bundle({mapOfGoods[0], mapOfGoods[2]})
+        mapOfBidders[2].set_preferred_bundle({mapOfGoods[2], mapOfGoods[1]})
+        mapOfBidders[3].set_preferred_bundle({mapOfGoods[0], mapOfGoods[1], mapOfGoods[2]})
+
+        # With the following values, a CE exists.
+        mapOfBidders[0].set_value(3)
+        mapOfBidders[1].set_value(3)
+        mapOfBidders[2].set_value(3)
+        mapOfBidders[3].set_value(5)
+
+        sm_market = Market(setOfGoods, setOfBidders)
+        print(bidders.SingleMinded.get_pretty_representation(sm_market))
+
+        # Test welfare-maximizing allocation
+        welfare_max_result_ilp = sm_market.welfare_max_program()
+        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 5.0)
+
+        # Try to compute linear CE prices.
+        pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'])
+        print(MarketInspector.pretty_print_pricing(pricing_result))
+        self.assertEqual(pricing_result['status'], 'Optimal')
+
+        # With the following values, a CE does not exists.
+        mapOfBidders[0].set_value(3, safe_check=False)
+        mapOfBidders[1].set_value(3, safe_check=False)
+        mapOfBidders[2].set_value(3, safe_check=False)
+        mapOfBidders[3].set_value(4, safe_check=False)
+        print(bidders.SingleMinded.get_pretty_representation(sm_market))
+
+        # Try to compute linear CE prices.
+        pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'])
+        print(MarketInspector.pretty_print_pricing(pricing_result))
+        self.assertEqual(pricing_result['status'], 'Infeasible')
+
+        # Try to compute quadratic CE prices.
+        pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
+        print(MarketInspector.pretty_print_pricing(pricing_result))
+        self.assertEqual(pricing_result['status'], 'Infeasible')

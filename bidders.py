@@ -187,25 +187,19 @@ class SingleMinded(Bidder):
         return Market(sm_market.get_goods(), new_bidders)
 
     @staticmethod
-    def get_data_frame_row(sm_market, include_values=False):
-        # Get a list of goods so that we can guarantee the order.
+    def get_market_as_list(sm_market, include_values=False):
+        # Get a list of goods and bidders so that order is guaranteed.
         goods = list(sm_market.get_goods())
+        bidders = list(sm_market.get_bidders())
+        market_as_list = [len(bidders),
+                          len(goods)] + \
+                         [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in bidders]
         if include_values:
-            row = [[len(sm_market.get_bidders()), len(sm_market.get_goods())] + \
-                   [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in sm_market.get_bidders()] + \
-                   [b.get_value_preferred_bundle() for b in sm_market.get_bidders()]]
+            market_as_list += [bidder.get_value_preferred_bundle() for bidder in bidders]
+            padding_len = 2 * (len(goods) + len(bidders)) - len(market_as_list)
         else:
-            row = [[len(sm_market.get_bidders()), len(sm_market.get_goods())] + \
-                   [[1 if good in bidder.get_preferred_bundle() else 0 for good in goods] for bidder in sm_market.get_bidders()]]
-        return row
-
-    @staticmethod
-    def get_csv_row(sm_market):
-        goods = list(sm_market.get_goods())
-        csv_row = f"{len(sm_market.get_bidders())},{len(sm_market.get_goods())}," + \
-                  ','.join(['"' + str([1 if good in bidder.get_preferred_bundle() else 0 for good in goods]) + '"' for bidder in sm_market.get_bidders()]) + "," + \
-                  ','.join([str(int(bidder.get_value_preferred_bundle())) for bidder in sm_market.get_bidders()])
-        return csv_row
+            padding_len = len(goods) + len(bidders) + 1 - len(market_as_list)
+        return market_as_list + ['' for i in range(0, padding_len)]
 
     @staticmethod
     def count_bidders_pref_bundle_sizes(sm_market):
