@@ -1,8 +1,4 @@
-PROJECT=sm-experiments-1
-BUCKET_NAME=sm-experiments-1
-CLUSTER=smexpcluster
-REGION=us-east4
-
+source config_env.sh
 gcloud dataproc jobs submit pyspark gs://${BUCKET_NAME}/generate_markets.py \
     --cluster=${CLUSTER} \
     --project=${PROJECT} \

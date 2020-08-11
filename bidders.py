@@ -1,5 +1,4 @@
 import random
-import itertools as it
 from typing import Set, Dict
 from market import Market
 from market_constituents import Good, Bidder
@@ -177,6 +176,34 @@ class SingleMinded(Bidder):
         return self._value if self._preferred_bundle.issubset(bundle) else 0.0
 
     @staticmethod
+    def get_mathematica_plot(sm_market, good_prefix='G', bidder_prefix='B', separation=0.5, vertex_size=0.25, font_size=20):
+        """
+        Produces a mathematica representation of this single-minded market.
+g=Graph[{1 <-> x, x<->y, G1<->B1},
+VertexCoordinates -> {1->{0, 2}, x->{0, 0}, y->{1, 2}, G1->{1, 1}, B1 -> {2, 1}},
+VertexLabels->{1->"1", x->"x", y->"y"}]
+        """
+        list_of_goods = list(sm_market.get_goods())
+        list_of_bidders = list(sm_market.get_bidders())
+        edges = ','.join([f"{good_prefix}{good.get_id()} <-> {bidder_prefix}{bidder.get_id()}"
+                          for bidder in list_of_bidders
+                          for good in bidder.get_preferred_bundle()])
+        vertex_coordinates = ','.join([f"{good_prefix}{good.get_id()}" + "->{0, " + str((good.get_id() * separation) + (separation / 2.0)) + "}"
+                                       for good in list_of_goods])
+        vertex_coordinates += "," + ','.join([f"{bidder_prefix}{bidder.get_id()}" + "->{0.5, " + str(bidder.get_id() * separation) + "}"
+                                              for bidder in list_of_bidders])
+        vertex_labels = ','.join([f"{good_prefix}{good.get_id()}-> {good_prefix}{good.get_id()}" for good in list_of_goods])
+        vertex_labels += "," + ','.join([f"{bidder_prefix}{bidder.get_id()}-> {bidder_prefix}{bidder.get_id()} : {bidder.get_value_preferred_bundle()}" for bidder in list_of_bidders])
+        vertex_style = ','.join([f"{good_prefix}{good.get_id()} -> Gray" for good in list_of_goods])
+        vertex_style += "," + ','.join([f"{bidder_prefix}{bidder.get_id()} -> Black" for bidder in list_of_bidders])
+        return "Graph[{" + edges + \
+               "}, \n\tVertexCoordinates -> {" + vertex_coordinates + \
+               "}, \n\tVertexLabels -> {" + vertex_labels + \
+               "}, \n\tVertexSize -> {" + str(vertex_size) + \
+               "}, \n\tVertexLabelStyle -> {" + str(font_size) + \
+               "}, \n\tVertexStyle -> {" + vertex_style + "}]"
+
+    @staticmethod
     def clone(sm_market):
         new_bidders = set()
         for old_bidder in sm_market.get_bidders():
@@ -292,6 +319,25 @@ class SingleMinded(Bidder):
             list_of_bidders = [bidder for bidder in list_of_bidders if bidder not in equiv_class]
             partition += [equiv_class]
         return partition
+
+    @staticmethod
+    def from_parquet_row_to_market(row):
+        """
+        Assumes that row is a tuple that looks like:
+        Pandas(Index=24737, num_bidders=3, num_goods=3, col_0='[1, 1, 0]', col_1='[1, 0, 1]', col_2='[0, 1, 1]', col_3='1', col_4='1', col_5='1', col_6='', col_7='', col_8='', col_9='', linear_clears=False, quadratic_clears=False)
+        :row: a pandas tuple
+        :return: a single-minded market.
+        """
+        map_of_goods = {i: Good(i) for i in range(0, row[2])}
+        set_of_goods = set(map_of_goods.values())
+        map_of_bidders = {i: SingleMinded(i, set_of_goods, random_init=False) for i in range(0, row[1])}
+
+        for i in range(0, row[1]):
+            list_of_preferred_goods = eval(row[i + 3])
+            map_of_bidders[i].set_preferred_bundle({map_of_goods[j] for j in range(0, row[2]) if list_of_preferred_goods[j] == 1})
+            map_of_bidders[i].set_value(int(row[i + row[1] + 3]))
+
+        return Market(set_of_goods, set(map_of_bidders.values()))
 
 
 types_of_bidders = [Additive, AdditiveWithBudget, SingleMinded]

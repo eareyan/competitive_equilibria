@@ -14,45 +14,45 @@ class MyTestCase(unittest.TestCase):
         A simple market for debugging purposes.
         :return: a market.
         """
-        setOfGoods = {Good(i) for i in range(0, 5)}
+        set_of_goods = {Good(i) for i in range(0, 5)}
 
         class ConstantValueBidder(Bidder):
             def value_query(self, bundle: Set[Good]) -> float:
                 # return len(bundle) * (1.0 / (self.get_id() + 1.0))
                 return len(bundle) * (self.get_id() + 1.0)
 
-        setOfBidders = {ConstantValueBidder(i, setOfGoods) for i in range(0, 5)}
+        set_of_bidders = {ConstantValueBidder(i, set_of_goods) for i in range(0, 5)}
 
-        return Market(setOfGoods, setOfBidders)
+        return Market(set_of_goods, set_of_bidders)
 
     def test_market_creation(self):
         """ Test the creation of markets. """
         # Check that the set of goods contains only one good.
         good0 = Good(0)
         good1 = Good(0)
-        setOfGoods = {good0, good1}
-        print(setOfGoods)
-        self.assertEqual(len(setOfGoods), 1)
+        set_of_goods = {good0, good1}
+        print(set_of_goods)
+        self.assertEqual(len(set_of_goods), 1)
 
         # Check that the set of bidders contains only one bidder.
         class DummyBidder(Bidder):
             def value_query(self, bundle: Set[Good]) -> float:
                 return -1.0
 
-        bidder0 = DummyBidder(0, setOfGoods)
-        bidder1 = DummyBidder(0, setOfGoods)
-        setOfBidders = {bidder0, bidder1}
-        print(setOfBidders)
-        self.assertEqual(len(setOfBidders), 1)
+        bidder0 = DummyBidder(0, set_of_goods)
+        bidder1 = DummyBidder(0, set_of_goods)
+        set_of_bidders = {bidder0, bidder1}
+        print(set_of_bidders)
+        self.assertEqual(len(set_of_bidders), 1)
 
         # Check that the set of goods contains two goods.
         good0 = Good(0)
         good1 = Good(1)
-        setOfGoods = {good0, good1}
-        print(setOfGoods)
-        self.assertEqual(len(setOfGoods), 2)
+        set_of_goods = {good0, good1}
+        print(set_of_goods)
+        self.assertEqual(len(set_of_goods), 2)
 
-        Market(setOfGoods, setOfBidders)
+        Market(set_of_goods, set_of_bidders)
 
     def test_welfare_max_ilp_example(self):
         """ This is a simple test for the welfare maximizing program. """
@@ -70,9 +70,9 @@ class MyTestCase(unittest.TestCase):
 
     def test_welfare_max_ilp_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the ilp. """
-        setOfGoods = {Good(i) for i in range(0, 10)}
-        setOfBidders = {bidders.AdditiveWithBudget(i, setOfGoods) for i in range(0, 10)}
-        market = Market(setOfGoods, setOfBidders)
+        set_of_goods = {Good(i) for i in range(0, 10)}
+        set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 10)}
+        market = Market(set_of_goods, set_of_bidders)
         print(bidders.AdditiveWithBudget.get_pretty_representation(market))
 
         # Solve for the welfare-maximizing allocation.
@@ -85,9 +85,9 @@ class MyTestCase(unittest.TestCase):
 
     def test_brute_force_solve_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the brute force solver. """
-        setOfGoods = {Good(i) for i in range(0, 5)}
-        setOfBidders = {bidders.AdditiveWithBudget(i, setOfGoods) for i in range(0, 5)}
-        awb_market = Market(setOfGoods, setOfBidders)
+        set_of_goods = {Good(i) for i in range(0, 5)}
+        set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 5)}
+        awb_market = Market(set_of_goods, set_of_bidders)
 
         welfare_brute_force, allocation_brute_force = awb_market.brute_force_welfare_max_solver()
         print(MarketInspector.pretty_print_allocation(allocation_brute_force))
@@ -103,9 +103,9 @@ class MyTestCase(unittest.TestCase):
         up_to_bidders = 6
         for t, bidder_type, number_of_goods, number_of_bidders in it.product(range(0, trials_per_configuration), bidders.types_of_bidders, range(1, up_to_goods), range(1, up_to_bidders)):
             # Create a random market with AWB valuations.
-            setOfGoods = {Good(i) for i in range(0, number_of_goods)}
-            setOfAWBBidders = {bidder_type(i, setOfGoods) for i in range(0, number_of_bidders)}
-            market = Market(setOfGoods, setOfAWBBidders)
+            set_of_goods = {Good(i) for i in range(0, number_of_goods)}
+            set_of_awb_bidders = {bidder_type(i, set_of_goods) for i in range(0, number_of_bidders)}
+            market = Market(set_of_goods, set_of_awb_bidders)
 
             # Solve for the WMA via brute force.
             welfare_brute_force, allocation_brute_force = market.brute_force_welfare_max_solver()
@@ -139,17 +139,17 @@ class MyTestCase(unittest.TestCase):
         good_0 = Good(0)
         good_1 = Good(1)
         good_2 = Good(2)
-        setOfGoods = {good_0, good_1, good_2}
+        set_of_goods = {good_0, good_1, good_2}
 
-        awb_bidder_0 = bidders.AdditiveWithBudget(0, setOfGoods, random_init=False)
+        awb_bidder_0 = bidders.AdditiveWithBudget(0, set_of_goods, random_init=False)
         awb_bidder_0.set_budget(7)
         awb_bidder_0.set_values({good_0: 1, good_1: 4, good_2: 5})
 
-        awb_bidder_1 = bidders.AdditiveWithBudget(1, setOfGoods, random_init=False)
+        awb_bidder_1 = bidders.AdditiveWithBudget(1, set_of_goods, random_init=False)
         awb_bidder_1.set_budget(5)
         awb_bidder_1.set_values({good_0: 3, good_1: 10, good_2: 1})
 
-        example_awb_market = Market(setOfGoods, {awb_bidder_0, awb_bidder_1})
+        example_awb_market = Market(set_of_goods, {awb_bidder_0, awb_bidder_1})
         print(bidders.AdditiveWithBudget.get_pretty_representation(example_awb_market))
 
         # Solve for the welfare-maximizing allocation (via ilp).
@@ -171,9 +171,9 @@ class MyTestCase(unittest.TestCase):
         """ Testing the pricing lp for additive bidders. In this case, there should always be a utility-maximizing pricing. """
         for _ in range(0, 10):
             # Draw a random additive market
-            setOfGoods = {Good(i) for i in range(0, 2)}
-            setOfBidders = {bidders.Additive(i, setOfGoods) for i in range(0, 2)}
-            simple_market = Market(setOfGoods, setOfBidders)
+            set_of_goods = {Good(i) for i in range(0, 2)}
+            set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 2)}
+            simple_market = Market(set_of_goods, set_of_bidders)
             print(bidders.Additive.get_pretty_representation(simple_market))
 
             # Solve for the welfare-maximizing allocation.
@@ -196,9 +196,9 @@ class MyTestCase(unittest.TestCase):
         status = 'Optimal'
         while status == 'Optimal':
             # Draw a random market.
-            setOfGoods = {Good(i) for i in range(0, 3)}
-            setOfBidders = {bidders.AdditiveWithBudget(i, setOfGoods) for i in range(0, 3)}
-            awb_market = Market(setOfGoods, setOfBidders)
+            set_of_goods = {Good(i) for i in range(0, 3)}
+            set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 3)}
+            awb_market = Market(set_of_goods, set_of_bidders)
             print(bidders.AdditiveWithBudget.get_pretty_representation(awb_market))
 
             # Solve for the welfare-maximizing allocation.
@@ -222,23 +222,23 @@ class MyTestCase(unittest.TestCase):
         good_0 = Good(0)
         good_1 = Good(1)
         good_2 = Good(2)
-        setOfGoods = {good_0, good_1, good_2}
+        set_of_goods = {good_0, good_1, good_2}
 
-        bidder_0 = bidders.SingleMinded(0, setOfGoods, random_init=False)
+        bidder_0 = bidders.SingleMinded(0, set_of_goods, random_init=False)
         bidder_0.set_preferred_bundle({good_0, good_2})
         bidder_0.set_value(5)
 
-        bidder_1 = bidders.SingleMinded(1, setOfGoods, random_init=False)
+        bidder_1 = bidders.SingleMinded(1, set_of_goods, random_init=False)
         bidder_1.set_preferred_bundle({good_0, good_1})
         # bidder_1.set_preferred_bundle({good_1})
         bidder_1.set_value(8)
 
-        bidder_2 = bidders.SingleMinded(2, setOfGoods, random_init=False)
+        bidder_2 = bidders.SingleMinded(2, set_of_goods, random_init=False)
         bidder_2.set_preferred_bundle({good_1, good_2})
         # bidder_2.set_preferred_bundle({good_0, good_1, good_2})
         bidder_2.set_value(10)
 
-        sm_market = Market(setOfGoods, {bidder_0, bidder_1, bidder_2})
+        sm_market = Market(set_of_goods, {bidder_0, bidder_1, bidder_2})
         # sm_market = Market(setOfGoods, {bidder_0, bidder_1})
         print(bidders.SingleMinded.get_pretty_representation(sm_market))
 
@@ -255,9 +255,9 @@ class MyTestCase(unittest.TestCase):
 
     def test_additive_non_linear_pricing_lp(self):
 
-        setOfGoods = {Good(i) for i in range(0, 3)}
-        setOfBidders = {bidders.Additive(i, setOfGoods) for i in range(0, 3)}
-        additive_market = Market(setOfGoods, setOfBidders)
+        set_of_goods = {Good(i) for i in range(0, 3)}
+        set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
+        additive_market = Market(set_of_goods, set_of_bidders)
         print(bidders.Additive.get_pretty_representation(additive_market))
 
         # Solve for the welfare-maximizing allocation.
@@ -276,9 +276,9 @@ class MyTestCase(unittest.TestCase):
     def test_enumerate_all_allocations(self):
 
         # Generate a random additive market.
-        setOfGoods = {Good(i) for i in range(0, 3)}
-        setOfBidders = {bidders.Additive(i, setOfGoods) for i in range(0, 3)}
-        additive_market = Market(setOfGoods, setOfBidders)
+        set_of_goods = {Good(i) for i in range(0, 3)}
+        set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
+        additive_market = Market(set_of_goods, set_of_bidders)
         print(bidders.Additive.get_pretty_representation(additive_market))
 
         # Compute all possible allocations of good to bidders in this market.

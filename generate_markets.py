@@ -1,3 +1,4 @@
+from prettytable import PrettyTable
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, explode
@@ -7,6 +8,7 @@ from market import Market
 from market_constituents import Good
 from typing import List
 import itertools as it
+import sys
 
 # Columns of the non_iso_bipartite_graphs files.
 LEN_BIG_PARTITION = 0
@@ -27,26 +29,26 @@ def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
     :return: a single-minded market
     """
     # Create the goods
-    mapOfGoods = {i: Good(i) for i in eval(graph_goods)}
-    setOfGoods = set(mapOfGoods.values())
+    map_of_goods = {i: Good(i) for i in eval(graph_goods)}
+    set_of_goods = set(map_of_goods.values())
 
     # Create the bidders - just their ids, we will populate their preferred sets and values later.
-    mapOfBidders = {i: SingleMinded(i, setOfGoods, random_init=False) for i in eval(graph_bidders)}
-    setOfBidders = set(mapOfBidders.values())
+    map_of_bidders = {i: SingleMinded(i, set_of_goods, random_init=False) for i in eval(graph_bidders)}
+    set_of_bidders = set(map_of_bidders.values())
 
     # For each edges of the bipartite graph, translate it to a set of goods.
-    edge_bidder_good = {bidder.get_id(): set() for bidder in setOfBidders}
+    edge_bidder_good = {bidder.get_id(): set() for bidder in set_of_bidders}
     for edges in eval(graph_edges):
         if edges[0] in edge_bidder_good:
-            edge_bidder_good[edges[0]].add(mapOfGoods[edges[1]])
+            edge_bidder_good[edges[0]].add(map_of_goods[edges[1]])
         else:
-            edge_bidder_good[edges[1]].add(mapOfGoods[edges[0]])
+            edge_bidder_good[edges[1]].add(map_of_goods[edges[0]])
 
     # Update each bidder's preferred bundle.
-    for bidder in setOfBidders:
-        mapOfBidders[bidder.get_id()].set_preferred_bundle(edge_bidder_good[bidder.get_id()])
+    for bidder in set_of_bidders:
+        map_of_bidders[bidder.get_id()].set_preferred_bundle(edge_bidder_good[bidder.get_id()])
 
-    return Market(setOfGoods, setOfBidders)
+    return Market(set_of_goods, set_of_bidders)
 
 
 def generate_market(*args):
@@ -96,17 +98,17 @@ def generate_market_values(*args, support_values: List[int] = None):
     # Build the market.
     num_bidders = int(args[NUM_BIDDERS_INDEX])
     num_goods = int(args[NUM_GOODS_INDEX])
-    listOfGoods = [Good(i) for i in range(0, num_goods)]
-    setOfGoods = set(listOfGoods)
-    setOfBidders = set()
+    list_of_goods = [Good(i) for i in range(0, num_goods)]
+    set_of_goods = set(list_of_goods)
+    set_of_bidders = set()
     for i in range(1, num_bidders + 1):
         bidder_demand_vector = eval(args[NUM_GOODS_INDEX + i])
-        sm_bidder = SingleMinded(i - 1, setOfGoods, random_init=False)
-        sm_bidder.set_preferred_bundle({listOfGoods[j] for j in range(0, num_goods) if bidder_demand_vector[j] == 1})
-        setOfBidders.add(sm_bidder)
+        sm_bidder = SingleMinded(i - 1, set_of_goods, random_init=False)
+        sm_bidder.set_preferred_bundle({list_of_goods[j] for j in range(0, num_goods) if bidder_demand_vector[j] == 1})
+        set_of_bidders.add(sm_bidder)
 
     # Compute the single-minded market equivalence classes.
-    sm_market = Market(setOfGoods, setOfBidders)
+    sm_market = Market(set_of_goods, set_of_bidders)
     equivalence_classes = SingleMinded.compute_bidders_equivalence_classes(sm_market)
 
     # Complete the market with values, where bidders in the same equivalence class receive values from a multi-set.
@@ -121,7 +123,7 @@ def generate_market_values(*args, support_values: List[int] = None):
     return return_markets
 
 
-def complete_markets_with_values(num_vertices, support_values, spark_session, input_markets_loc, output_markets_loc):
+def complete_markets_with_values(num_vertices: int, max_value: int, spark_session, input_markets_loc: str, output_markets_loc: str, number_of_partitions: int):
     """
     Completes markets with values for bidders, i.e., values for their preferred bundles.
     """
@@ -129,10 +131,16 @@ def complete_markets_with_values(num_vertices, support_values, spark_session, in
                                   [StructField(f"col_{i}", StringType(), False) for i in range(0, 2 * (num_vertices - 1))]))
 
     # Register the udf. Here, we fix the support value list.
-    udf_generate_markets_values = udf(lambda *args: generate_market_values(*args, support_values=support_values), schema)
+    udf_generate_markets_values = udf(lambda *args: generate_market_values(*args, support_values=[i for i in range(1, max_value + 1)]), schema)
 
     # Read the non-iso markets to complete them with values.
     df = spark_session.read.parquet(f"{input_markets_loc}/non_iso_markets_vertices_{num_vertices}.parquet")
+
+    # Set the number of partitions.
+    default_num_partitions = df.rdd.getNumPartitions()
+    number_of_partitions = max(default_num_partitions, number_of_partitions)
+    df = df.coalesce(number_of_partitions)
+    print(f"default_num_partitions = {default_num_partitions}, new number_of_partitions = {df.rdd.getNumPartitions()}")
 
     # Apply the udf function udf_generate_markets_values. Notice the starred expression to send the data frame column names.
     df = df.withColumn('non_iso_markets', udf_generate_markets_values(*['num_bidders',
@@ -142,29 +150,54 @@ def complete_markets_with_values(num_vertices, support_values, spark_session, in
     # Select the columns and save the data.
     df = df.select(explode(df.non_iso_markets)).select('col.*')
     df.printSchema()
-    df.write.mode('overwrite').parquet(f"{output_markets_loc}sm_market_{num_vertices}.parquet")
-
-
-def generate_and_save_all_non_iso_markets(spark_session):
-    for total_num_vertices in range(2, 9):
-        generate_and_save_non_iso_markets(total=total_num_vertices,
-                                          spark_session=spark_session,
-                                          input_graphs_loc='non_iso_bipartite_graphs/',
-                                          output_markets_loc='non_iso_markets/')
-
-
-def generate_and_save_all_sm_markets(spark_session):
-    # Generating markets where bidders have values 1, ..., max_value.
-    max_value = 10
-    for total_num_vertices in range(2, 9):
-        complete_markets_with_values(num_vertices=total_num_vertices,
-                                     support_values=[i for i in range(1, max_value + 1)],
-                                     spark_session=spark_session,
-                                     input_markets_loc='non_iso_markets/',
-                                     output_markets_loc=f"all_sm_markets/values_1_to_{max_value}/")
+    df.write.mode('overwrite').parquet(f"{output_markets_loc}values_1_to_{max_value}/sm_market_{num_vertices}.parquet")
 
 
 if __name__ == '__main__':
+    # Check the arguments.
+    if len(sys.argv) != 1 and len(sys.argv) != 6:
+        raise Exception(f"Either 0 or 5 command line arguments are accepted, received: {sys.argv}")
+
+    # Run either local or remote in a cluster.
+    if len(sys.argv) == 1:
+        mode = 'local'
+        total_num_vertices = 8
+        the_input_path = 'non_iso_markets/'
+        the_output_path = 'all_sm_markets/'
+        the_number_of_partitions = 1
+    else:
+        mode = 'remote'
+        total_num_vertices = int(sys.argv[1])
+        the_input_path = sys.argv[2]
+        the_output_path = sys.argv[3]
+        the_number_of_workers = int(sys.argv[4])
+        the_number_of_cpus_per_worker = int(sys.argv[5])
+        # See the following URL for how to set the number of partitions in a cluster: https://medium.com/@adrianchang/apache-spark-partitioning-e9faab369d14
+        the_number_of_partitions = the_number_of_workers * the_number_of_cpus_per_worker * 4
+
+    # Print the experiment configuration.
+    experiment_config_ptable = PrettyTable()
+    experiment_config_ptable.title = 'Experiment configuration'
+    experiment_config_ptable.field_names = ['configuration', 'value']
+    experiment_config_ptable.add_row(['type', mode])
+    experiment_config_ptable.add_row(['total_num_vertices', total_num_vertices])
+    experiment_config_ptable.add_row(['input_path', the_input_path])
+    experiment_config_ptable.add_row(['output_path', the_output_path])
+    experiment_config_ptable.add_row(['number_of_partitions', the_number_of_partitions])
+    print(experiment_config_ptable)
+
+    # Generate spark context and session.
+    the_sc = SparkContext()
+    the_spark_session = SparkSession(the_sc)
+
+    # Run the task: complete the markets with values. For now, values are fixed to max of 10.
+    complete_markets_with_values(num_vertices=total_num_vertices,
+                                 max_value=10,
+                                 spark_session=the_spark_session,
+                                 input_markets_loc=the_input_path,
+                                 output_markets_loc=the_output_path,
+                                 number_of_partitions=the_number_of_partitions)
+
     """
     Pipeline for generating non-isomorphic, single-minded markets.
         
@@ -188,12 +221,3 @@ if __name__ == '__main__':
 
         Markets in folder all_sm_markets/ are meant to be ready to experiment with, see experiments.py.  
     """
-    # Generate spark context and session.
-    the_sc = SparkContext()
-    the_spark_session = SparkSession(the_sc)
-
-    # Generate and save all non-isomorphic markets.
-    # generate_and_save_all_non_iso_markets(the_spark_session)
-
-    # Completing non-iso markets with values.
-    generate_and_save_all_sm_markets(the_spark_session)

@@ -1,19 +1,13 @@
-PROJECT=sm-experiments-1
-BUCKET_NAME=sm-experiments-1
-CLUSTER=smexpcluster
-REGION=us-east4
-
-zip sm_project_exp.zip generate_markets.py bidders.py experiments_pyspark.py market_constituents.py market.py
-
-gsutil cp sm_project_exp.zip gs://${BUCKET_NAME}/
-gsutil cp generate_markets.py gs://${BUCKET_NAME}/
-gsutil cp experiments_pyspark.py gs://${BUCKET_NAME}/
+source config_env.sh
 
 gcloud dataproc clusters create ${CLUSTER} \
-    --project=${PROJECT} \
-    --region=${REGION} \
-    --image-version=1.5 \
-    --num-workers=3 \
-    --properties spark:spark.yarn.executor.memoryOverhead=6G \
-    --metadata 'PIP_PACKAGES=PuLP==2.2 prettytable==0.7.2 PTable==0.9.2' \
-    --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh
+  --project=${PROJECT} \
+  --region=${REGION} \
+  --max-idle=30m \
+  --image-version=1.5 \
+  --master-machine-type=n1-standard-2 \
+  --worker-machine-type=n1-standard-2 \
+  --num-workers=3 \
+  --properties spark:spark.yarn.executor.memoryOverhead=2G \
+  --metadata 'PIP_PACKAGES=PuLP==2.2 prettytable==0.7.2 PTable==0.9.2' \
+  --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh

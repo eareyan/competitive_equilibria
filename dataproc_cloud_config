@@ -1,12 +1,47 @@
-## Cluster configuration variables
+"""
+Pipeline:
+    authenticate into the right google cloud account
+    create project.
+    create bucket.
+    move files to bucket.
+    create cluster.
+    run job.
+"""
 
-PROJECT=temporal-falcon-284913
-BUCKET_NAME=sm_experiments
+## Login into cloud
+gcloud auth login
+
+## Cluster configuration variables
+PROJECT=sm-experiments-1
+BUCKET_NAME=sm-experiments-1
 CLUSTER=smexpcluster
 REGION=us-east4
 
+## Create a project.
+gcloud projects create ${PROJECT}
+
+## Set the project
+gcloud config set project ${PROJECT}
+
+## Link billing
+## To see available billing:
+gcloud alpha billing accounts list
+
+## To set billing account
+gcloud alpha billing accounts projects link ${PROJECT} --billing-account=013B9E-257C86-3267A4
+
+
+## Create bucket.
+gsutil mb gs://${PROJECT}/
+
 ## Zip project files
-zip sm_project_exp.zip bidders.py experiments_pyspark.py market_constituents.py market.py
+zip sm_project_exp.zip generate_markets.py bidders.py experiments_pyspark.py market_constituents.py market.py
+
+# Copy files
+gsutil cp sm_project_exp.zip gs://${PROJECT}/
+gsutil cp generate_markets.py gs://${PROJECT}/
+gsutil cp experiments_pyspark.py gs://${PROJECT}/
+gsutil cp -r non_iso_markets gs://${PROJECT}/
 
 ## To Create a cluster with a single node. Usually for debugging purposes.
 
@@ -20,16 +55,25 @@ gcloud dataproc clusters create ${CLUSTER} \
 
 ## To Create a cluster with a multiple workers.
 
+# Documentation to set yarn properties: https://stackoverflow.com/questions/50587413/container-killed-by-yarn-for-exceeding-memory-limits?noredirect=1&lq=1
 gcloud dataproc clusters create ${CLUSTER} \
     --project=${PROJECT} \
     --region=${REGION} \
     --image-version=1.5 \
     --num-workers=3 \
+    --properties spark:spark.yarn.executor.memoryOverhead=6G \
     --metadata 'PIP_PACKAGES=PuLP==2.2 prettytable==0.7.2 PTable==0.9.2' \
     --initialization-actions gs://goog-dataproc-initialization-actions-${REGION}/python/pip-install.sh
 
 # To run an experiment on the cluster. The relevant python files must be in gs://${BUCKET_NAME}/sm_project_exp.zip
 # And the entry point must be in gs://${BUCKET_NAME}/experiments_pyspark.py
+
+	gcloud dataproc jobs submit pyspark gs://${BUCKET_NAME}/generate_markets.py \
+	    --cluster=${CLUSTER} \
+	    --project=${PROJECT} \
+	    --region=${REGION} \
+	    --py-files gs://${BUCKET_NAME}/sm_project_exp.zip \
+	    -- 8 gs://${BUCKET_NAME}/non_iso_markets/ gs://${BUCKET_NAME}/ 3 4
 
 	gcloud dataproc jobs submit pyspark gs://${BUCKET_NAME}/experiments_pyspark.py \
 	    --cluster=${CLUSTER} \
