@@ -130,3 +130,6 @@ dmypy.json
 
 # Ignore PyCharm's .idea folder
 .idea/
+
+# Ignore MAC's hidden folders
+.DS_Store
