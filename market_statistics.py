@@ -18,6 +18,7 @@ def find_example(sets_of_pref_bundles):
                 sm_market = SingleMinded.from_parquet_row_to_market(row)
                 print(SingleMinded.get_pretty_representation(sm_market))
                 print(row)
+                print(SingleMinded.get_mathematica_plot(sm_market))
 
 
 def write_examples_to_file(num_vertices):
@@ -33,9 +34,14 @@ def write_examples_to_file(num_vertices):
 
 if __name__ == "__main__":
     # write_examples_to_file(8)
+
     # Finding example from http://www.slahaie.net/pubs/LahaieLu19.pdf, page 6 - 7
     # find_example([([1, 1, 1], 4), ([1, 1, 0], 3), ([1, 0, 1], 3), ([0, 1, 1], 3)])
+
     # TODO: The following example shows the enumeration is not quite correct yet
     # This is because the following two markets are isomorphic but they show in different places.
-    find_example([([1, 0, 1], 1), ([1, 1, 0], 2)])
-    find_example([([1, 0, 1], 2), ([1, 1, 0], 1)])
+    # find_example([([1, 0, 1], 1), ([1, 1, 0], 2)])
+    # find_example([([1, 0, 1], 2), ([1, 1, 0], 1)])
+
+    # The following example is the pattern that makes a 3 by 3 market fail
+    find_example([([1, 0, 1], 1), ([1, 1, 0], 1), ([0, 1, 1], 1)])
