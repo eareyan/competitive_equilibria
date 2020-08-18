@@ -1,4 +1,5 @@
 from prettytable import PrettyTable
+import itertools as it
 
 
 class MarketInspector:
@@ -77,3 +78,54 @@ class MarketInspector:
                                        ('status', 'sec', False)]:
             pricing_stats_table.add_row([stat, f"{result[stat] : .4f} {units}" if do_format else f"{result[stat]}"])
         return pricing_stats_table
+
+    @staticmethod
+    def noisy_bidder_values(noisy_bidder):
+        value_table = PrettyTable()
+        value_table.title = f"Noisy Values for Bidder #{noisy_bidder.get_id()}"
+        value_table.field_names = ['Bundle', 'Avg', 'Eps', 'Avg+Eps', 'Avg-Eps', 'N']
+        for bundle in noisy_bidder.get_map_base_bundles_to_values().keys():
+            avg, eps, actual_num_samples = noisy_bidder.get_current_empirical_values(bundle)
+            value_table.add_row([bundle,
+                                 f"{avg : .4f}",
+                                 f"{eps : .4f}",
+                                 f"{avg + eps : .4f}",
+                                 f"{avg - eps : .4f}",
+                                 f"{actual_num_samples : .4f}"])
+        return value_table
+
+    @staticmethod
+    def inspect_elicitation_with_pruning(result, noisy_market):
+        parameters_table = PrettyTable()
+        parameters_table.title = 'Parameters of EAP'
+        parameters_table.field_names = ['Parameter', 'Value']
+        parameters_table.add_row(['Sampling Schedule', result['sampling_schedule']])
+        parameters_table.add_row(['Delta Schedule', result['delta_schedule']])
+        parameters_table.add_row(['Target Epsilon', result['target_epsilon']])
+        parameters_table.add_row(['c', result['c']])
+        parameters_table.add_row(['---', '---'])
+        parameters_table.add_row(['Time', f"{result['time'] : .4f}"])
+        parameters_table.add_row(['Total Num Iter.', result['total_num_iterations']])
+        parameters_table.add_row(['Actual Epsilon', f"{result['actual_eps'] : .4f}"])
+
+        result_table = PrettyTable()
+        result_table.title = 'Results of EAP'
+        result_table.field_names = ['Iteration', 'Num. Active', 'Num. Pruned']
+        for t in range(0, result['total_num_iterations']):
+            if t in result:
+                result_table.add_row([t,
+                                      len(result[t]['_active_consumer_bundle_pair']),
+                                      len(result[t]['prune_set'])])
+
+        prune_deep_dive_table = PrettyTable()
+        prune_deep_dive_table.title = 'Evolution of Pruning'
+        prune_deep_dive_table.field_names = ['Bidder', 'Bundle', 'Active']
+        for t in range(0, result['total_num_iterations']):
+            if t in result:
+                prune_deep_dive_table.add_row(['---', f"At the End of Iteration #{t}", '---'])
+                for bidder in noisy_market.get_bidders():
+                    for bundle in bidder.get_base_bundles():
+                        # print(bidder, bundle, (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair'])
+                        prune_deep_dive_table.add_row([bidder, bundle, (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair']])
+
+        return parameters_table, result_table, prune_deep_dive_table

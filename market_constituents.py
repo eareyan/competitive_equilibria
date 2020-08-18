@@ -1,5 +1,8 @@
-import abc
-from typing import Set
+import itertools as it
+from abc import abstractmethod
+from typing import Set, Callable, Dict, Tuple, FrozenSet, Union, Optional
+
+import numpy as np
 
 
 class Good:
@@ -40,20 +43,22 @@ class Good:
         return self.__good_id
 
 
-class Bidder(abc.ABC):
+class Bidder:
     """ Representation of a bidder a market.
     This is an abstract class. Concrete bidder implementations specify how bidders
      value bundle of queries via value_query method. """
 
-    def __init__(self, bidder_id: int, goods: Set[Good]):
+    map_list_all_bundles = {}
+
+    def __init__(self, bidder_id: int, base_bundles: Optional[Set[FrozenSet[Good]]]):
         """
         A bidder must be given a unique integer id. Note that different bidders in a market must have different ids.
         The bidder receives the goods over which it will compute its valuation.
         :param bidder_id: the bidder id, an integer.
-        :param goods: a set of goods, each good of type Good.
+        :param base_bundles: a set of frozenset of goods. Each frozen is a bundle for which the bidder has positive value.
         """
-        self.__bidder_id = bidder_id
-        self._goods = goods
+        self.__bidder_id: int = bidder_id
+        self._base_bundles: Set[FrozenSet[Good]] = base_bundles
 
     def __hash__(self):
         """
@@ -76,17 +81,75 @@ class Bidder(abc.ABC):
         """
         return isinstance(other, Bidder) and other.__bidder_id == self.__bidder_id
 
-    def get_id(self):
+    def get_id(self) -> int:
         """
         :return: the bidder's id
         """
         return self.__bidder_id
 
-    @abc.abstractmethod
-    def value_query(self, bundle: Set[Good]) -> float:
+    def get_base_bundles(self) -> Set[FrozenSet[Good]]:
+        """
+        :return: the bidder's base bundles, i.e., those for which the bidders has positive value.
+        """
+        return self._base_bundles
+
+    @abstractmethod
+    def value_query(self, bundle: Union[Set[Good], FrozenSet[Good]]) -> float:
         """
         Given a bundle of goods, i.e., a set of goods, returns a numerical value for the bundle.
         :param bundle: a set of Goods.
         :return: the value of the bundle of goods, a float.
         """
         pass
+
+    @staticmethod
+    def get_set_of_all_bundles(n: int) -> Set[FrozenSet[Good]]:
+        """
+        :param n:
+        :return:
+        """
+        if n not in Bidder.map_list_all_bundles:
+            s = list({Good(i) for i in range(0, n)})
+            Bidder.map_list_all_bundles[n] = {frozenset(bundle) for bundle in it.chain.from_iterable(it.combinations(s, r) for r in range(len(s) + 1))}
+        return Bidder.map_list_all_bundles[n]
+
+
+class NoisyBidder(Bidder):
+    """ A noisy bidder has a set of base values for each bundle in the market and actual values are given by empirical averages. """
+
+    def __init__(self, bidder_id: int, map_base_bundles_to_values: Dict[FrozenSet[Good], float], noise_generator: Callable[[int], np.array]):
+        super().__init__(bidder_id, set(map_base_bundles_to_values.keys()))
+        self._map_base_bundles_to_values: Dict[FrozenSet[Good], float] = map_base_bundles_to_values
+        self._noise_generator: Callable[[int], np.array] = noise_generator
+        # The empirical values consist of tuple (value, epsilon) for each bundle in the market.
+        # At creation time, these values are unknown and must be obtained via sample_value_query method.
+        self._current_empirical_values: Dict[FrozenSet[Good], Tuple[float, float, int]] = {frozenset(bundle): (None, None, 0)
+                                                                                           for bundle, _ in self._map_base_bundles_to_values.items()}
+
+    def get_map_base_bundles_to_values(self):
+        return self._map_base_bundles_to_values
+
+    def get_current_empirical_values(self, bundle: Union[Set[Good], FrozenSet[Good]]) -> Tuple[float, float, int]:
+        """
+        :param bundle: a bundle of goods.
+        :return: a tuple (empirical average, epsilon, number of samples)
+        """
+        return self._current_empirical_values[frozenset(bundle)]
+
+    def value_query(self, bundle: Union[Set[Good], FrozenSet[Good]]) -> float:
+        """
+        :param bundle: a bundle of goods.
+        :return: the current empirical average as the response to the value query for the given bundle.
+        """
+        assert self._current_empirical_values[frozenset(bundle)][0] is not None
+        return self._current_empirical_values[frozenset(bundle)][0]
+
+    def sample_value_query(self, bundle: FrozenSet[Good], number_of_samples: int, epsilon: float):
+        """
+        :param bundle:
+        :param number_of_samples:
+        :param epsilon:
+        """
+        assert bundle in self._map_base_bundles_to_values
+        empirical_average = np.mean(self._map_base_bundles_to_values[bundle] + self._noise_generator(number_of_samples))
+        self._current_empirical_values[bundle] = (empirical_average, epsilon, number_of_samples)

@@ -1,18 +1,20 @@
 import random
 from typing import Set, Dict
+
+from prettytable import PrettyTable
+
 from market import Market
 from market_constituents import Good, Bidder
-from prettytable import PrettyTable
 
 
 class Additive(Bidder):
     """ Represents an additive bidder, i.e., its value for a bundle is given by summing the the values of the goods in the bundle."""
 
     def __init__(self, bidder_id: int, goods: Set[Good], random_init=True):
-        super().__init__(bidder_id, goods)
+        super().__init__(bidder_id, Bidder.get_set_of_all_bundles(len(goods)))
         if random_init:
             self._values = {}
-            for good in self._goods:
+            for good in goods:
                 self._values[good] = random.randint(1, 10)
         else:
             self._values = None
@@ -70,7 +72,7 @@ class AdditiveWithBudget(Additive):
         super().__init__(bidder_id, goods, False)
         if random_init:
             self._budget = random.randint(1, 10)
-            self._values = {good: random.randint(1, 10) for good in self._goods}
+            self._values = {good: random.randint(1, 10) for good in goods}
         else:
             self._budget = None
             self._values = None
@@ -80,7 +82,6 @@ class AdditiveWithBudget(Additive):
         Sets the budget. Throws exception in case the budget was previously set.
         :param budget: the bidder's budget, a float
         """
-        print(f"setting budget when budget is {self._budget}")
         if self._budget is not None:
             raise Exception("Cannot re-set the budget of an AWB bidder.")
         self._budget = budget
@@ -124,10 +125,11 @@ class SingleMinded(Bidder):
     """ Represents a single-minded bidder. """
 
     def __init__(self, bidder_id: int, goods: Set[Good], random_init=True):
-        super().__init__(bidder_id, goods)
+        super().__init__(bidder_id, None)
         if random_init:
             self._preferred_bundle = set(random.sample(goods, random.randint(1, len(goods))))
             self._value = random.randint(1, 10)
+            self._base_bundles = {frozenset(self._preferred_bundle)}
         else:
             self._preferred_bundle = None
             self._value = None
@@ -140,6 +142,7 @@ class SingleMinded(Bidder):
         if self._preferred_bundle is not None:
             raise Exception("The preferred bundle can only be set once. ")
         self._preferred_bundle = preferred_bundle
+        self._base_bundles = {frozenset(self._preferred_bundle)}
 
     def set_value(self, value: float, safe_check=True):
         """
@@ -202,16 +205,6 @@ VertexLabels->{1->"1", x->"x", y->"y"}]
                "}, \n\tVertexSize -> {" + str(vertex_size) + \
                "}, \n\tVertexLabelStyle -> {" + str(font_size) + \
                "}, \n\tVertexStyle -> {" + vertex_style + "}]"
-
-    @staticmethod
-    def clone(sm_market):
-        new_bidders = set()
-        for old_bidder in sm_market.get_bidders():
-            new_bidder = SingleMinded(old_bidder.get_id(), sm_market.get_goods(), random_init=False)
-            new_bidder.set_preferred_bundle(old_bidder.get_preferred_bundle())
-            new_bidder.set_value(old_bidder.get_value_preferred_bundle())
-            new_bidders.add(new_bidder)
-        return Market(sm_market.get_goods(), new_bidders)
 
     @staticmethod
     def get_market_as_list(sm_market, include_values=False):

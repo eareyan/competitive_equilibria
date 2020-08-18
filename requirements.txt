@@ -13,3 +13,4 @@ sagemath==1.3.0
 six==1.15.0
 pyspark==3.0.0
 pyarrow==1.0.0
+pkbar==0.4

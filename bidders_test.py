@@ -99,6 +99,7 @@ class MyTestCase(unittest.TestCase):
 
         # Test welfare-maximizing allocation
         welfare_max_result_ilp = sm_market.welfare_max_program()
+        # print(welfare_max_result_ilp)
         print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
         print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 10.0)
@@ -120,30 +121,6 @@ class MyTestCase(unittest.TestCase):
             print(bidders.SingleMinded.get_pretty_representation(sm_market))
             print(bidders.SingleMinded.compute_bidders_equivalence_classes(sm_market))
             self.assertLessEqual(len(bidders.SingleMinded.compute_bidders_equivalence_classes(sm_market)), num_goods)
-
-    def test_clone_sm_market(self):
-        set_of_goods = {Good(i) for i in range(0, 3)}
-        set_of_bidders = {bidders.SingleMinded(0, set_of_goods, random_init=False)}
-        market_0 = Market(set_of_goods, set_of_bidders)
-        print(market_0)
-
-        market_1 = bidders.SingleMinded.clone(market_0)
-        print(market_1)
-
-        # Update market 1
-        print('\n')
-        for bidder in market_1.get_bidders():
-            print(bidder.get_preferred_bundle())
-            bidder.set_preferred_bundle({Good(0), Good(1)})
-            print(bidder.get_preferred_bundle())
-
-        # Market 0 should stay the same
-        print('\n')
-        for bidder in market_0.get_bidders():
-            print(f"market_0: {bidder.get_preferred_bundle()}")
-
-        self.assertEqual(len(market_0.get_bidders()), len(market_1.get_bidders()))
-        self.assertEqual(len(market_0.get_goods()), len(market_1.get_goods()))
 
     # Taken from http://www.slahaie.net/pubs/LahaieLu19.pdf, page 6 - 7
     def test_non_existence_sm_example(self):
@@ -235,3 +212,7 @@ class MyTestCase(unittest.TestCase):
         print(bidders.SingleMinded.get_mathematica_plot(sm_market, good_prefix='G', bidder_prefix='B'))
 
         self.assertEqual(True, True)
+
+
+if __name__ == '__main__':
+    unittest.main()

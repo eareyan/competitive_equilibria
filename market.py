@@ -1,7 +1,9 @@
-import pulp
-import time
 import itertools as it
-from typing import Set, Dict, Tuple, List
+import time
+from typing import Set, Dict, Tuple, List, Optional, FrozenSet, Union
+
+import pulp
+
 from market_constituents import Good, Bidder
 
 
@@ -9,20 +11,17 @@ class Market:
     """ Representation of a Market, which contains a set of goods and a set of bidders that have value over sets of goods."""
 
     def __init__(self, goods: Set[Good], bidders: Set[Bidder]):
-        self._goods = goods
-        self._bidders = bidders
-        # Generate an iterable with all bundles.
-        s = list(self._goods)
-        self.__all_bundles_iterable = it.chain.from_iterable(it.combinations(s, r) for r in range(len(s) + 1))
-        # We won't generate the list of all bundles until it is needed.
-        self.__all_bundles_list = None
-        # Maps for LP variables, generated (once) in function generate_vars_maps
-        # Map {(bidder, bundle) : [pulp.LpVariable]}
-        self.__bidder_bundle_vars = None
-        # Map {bidder : [pulp.LpVariable]}
-        self.__bidders_vars = None
-        # Map {good : [pulp.LpVariable]}
-        self.__goods_vars = None
+        # Fundamental pieces of any market are: a set of goods and a set of bidders.
+        self._goods: Set[Good] = goods
+        self._bidders: Set[Bidder] = bidders
+
+        # Maps for LP variables, generated (once) in function generate_vars_maps for solving the welfare maximizing allocation.
+        # Maps a bidder, bundle pair, to a pulp variable.
+        self._bidder_bundle_vars: Optional[Dict[Tuple[Bidder, FrozenSet[Good]], pulp.LpVariable]] = None
+        # Maps a bidder to a pulp variable.
+        self.__bidders_vars: Optional[Dict[Bidder, pulp.LpVariable]] = None
+        # Maps a good to a pulp variable.
+        self.__goods_vars: Optional[Dict[Good, pulp.LpVariable]] = None
 
     def __repr__(self):
         """
@@ -45,35 +44,30 @@ class Market:
         """
         return self._goods
 
-    def get_all_enumerated_bundles(self):
-        """
-        Generates a list with all bundles of this market. Implements singleton pattern.
-        :return: a list with all bundles of this market. The list is generated only the first time
-        this method is call. Subsequent call return private attribute self.__all_bundles_list.
-        """
-        if self.__all_bundles_list is None:
-            self.__all_bundles_list = list(enumerate(self.__all_bundles_iterable))
-        return self.__all_bundles_list
-
     def generate_vars_maps(self):
         """
             Creates some auxiliary data structures to more efficiently loop through the bundles
             when creating the constraints of the welfare maximizing mathematical program.
         """
-        if self.__bidder_bundle_vars is None and self.__bidders_vars is None and self.__goods_vars is None:
+        if self._bidder_bundle_vars is None and self.__bidders_vars is None and self.__goods_vars is None:
             bidder_bundle_vars = {}
-            bidders_vars = {bidder.get_id(): [] for bidder in self._bidders}
-            goods_vars = {good.get_id(): [] for good in self._goods}
-            # An enumerated bundle is a tuple (int, bundle) where int is a unique integer in the range 0...2^n
-            enumerated_bundle: Tuple[int, Set[Good]]
-            for bidder, enumerated_bundle in it.product(self._bidders, self.get_all_enumerated_bundles()):
-                var = pulp.LpVariable(f"allocation_{bidder.get_id()}_{enumerated_bundle[0]}", lowBound=0, upBound=1, cat='Integer')
-                bidders_vars[bidder.get_id()] += [var]
-                bidder_bundle_vars[bidder.get_id(), enumerated_bundle[0]] = (bidder, enumerated_bundle[1], var)
-                for good in enumerated_bundle[1]:
-                    goods_vars[good.get_id()] += [var]
+            bidders_vars = {}
+            goods_vars = {}
+            # For each bidder, bundle pair, such that the bidder has a positive value for the bundle,
+            # create a 0/1 variable that indicates whether the bidder gets the bundle or not.
+            for bidder in self._bidders:
+                for bundle in bidder.get_base_bundles():
+                    var = pulp.LpVariable(f"allocation_{bidder}_{bundle}", lowBound=0, upBound=1, cat='Integer')
+                    if bidder not in bidders_vars:
+                        bidders_vars[bidder] = []
+                    bidders_vars[bidder] += [var]
+                    bidder_bundle_vars[bidder, bundle] = var
+                    for good in bundle:
+                        if good not in goods_vars:
+                            goods_vars[good] = []
+                        goods_vars[good] += [var]
             # Store the maps in the object.
-            self.__bidder_bundle_vars = bidder_bundle_vars
+            self._bidder_bundle_vars = bidder_bundle_vars
             self.__bidders_vars = bidders_vars
             self.__goods_vars = goods_vars
             # print("******************")
@@ -85,7 +79,7 @@ class Market:
 
     def welfare_max_program(self):
         """
-        :return:
+        :return: a dictionary with various data.
         """
         result = {}
         t0_initial = time.time()
@@ -97,21 +91,19 @@ class Market:
 
         # Create Objective.
         t0 = time.time()
-        model += pulp.lpSum([bidder_bundle_var * bidder.value_query(bundle) for bidder, bundle, bidder_bundle_var in self.__bidder_bundle_vars.values()])
+        model += pulp.lpSum([bidder_bundle_var * bidder.value_query(bundle) for (bidder, bundle), bidder_bundle_var in self._bidder_bundle_vars.items()])
         result['objective_build_time'] = time.time() - t0
 
         # Create goods constraints: a good cannot be over allocated.
         t0 = time.time()
-        for good in self._goods:
-            # print(f"{good.get_id()} - {len(self.__goods_vars[good.get_id()])}")
-            model += pulp.lpSum(self.__goods_vars[good.get_id()]) <= 1.0
+        for good in self.__goods_vars.keys():
+            model += pulp.lpSum(self.__goods_vars[good]) <= 1.0, f"Good #{good.get_id()} constraint"
         result['goods_constraints_time'] = time.time() - t0
 
         # Create bidders constraints: a bidder cannot be allocated two bundles.
         t0 = time.time()
-        for bidder in self._bidders:
-            # print(f"{bidder.get_id()} - {len(self.__bidders_vars[bidder.get_id()])}")
-            model += pulp.lpSum(self.__bidders_vars[bidder.get_id()]) <= 1.0
+        for bidder in self.__bidders_vars.keys():
+            model += pulp.lpSum(self.__bidders_vars[bidder]) <= 1.0, f"Bidder #{bidder.get_id()} constraint"
 
         result['bidders_constraints_time'] = time.time() - t0
 
@@ -123,21 +115,20 @@ class Market:
         model.solve(pulp.PULP_CBC_CMD(msg=False))
         result['time_to_solve_ilp'] = time.time() - t0
 
-        # Read the value of the optimal solution.
+        # Compute the optimal allocation as map from bidders to their allocated bundle.
         optimal_allocation = {}
-        # An enumerated bundle is a tuple (int, bundle) where int is a unique integer in the range 0...2^n
-        enumerated_bundle: Tuple[int, Set[Good]]
-        for bidder, enumerated_bundle in it.product(self._bidders, self.get_all_enumerated_bundles()):
-            # print(f"{bidder.get_id()},{bundle[0]} : {self.__bidder_bundle_vars[bidder.get_id(), bundle[0]][2].varValue}")
-            if int(self.__bidder_bundle_vars[bidder.get_id(), enumerated_bundle[0]][2].varValue) == 1:
-                optimal_allocation[bidder] = self.get_all_enumerated_bundles()[enumerated_bundle[0]][1]
+        # For each bidder, bundle, check if the bundle was assigned to the bidder and add it to the optimal allocation.
+        for bidder in self._bidders:
+            for bundle in bidder.get_base_bundles():
+                if int(self._bidder_bundle_vars[bidder, frozenset(bundle)].varValue) == 1:
+                    optimal_allocation[bidder] = bundle
         result['optimal_allocation'] = optimal_allocation
 
         # Record some statistics
-        result['model'] = pulp.value(model.objective)
+        result['model'] = model
         result['status'] = pulp.LpStatus[model.status]
-        # Fail if the program was not optimal
-        assert result['status'] == 'Optimal'
+        # Fail if the program was not optimal - This might not be the case anymore, as we accept initial assignment and there is no guarantee those are feasible.
+        # assert result['status'] == 'Optimal'
         result['optimal_welfare'] = pulp.value(model.objective) if pulp.value(model.objective) is not None else 0.0
 
         return result
@@ -194,7 +185,7 @@ class Market:
         # Return the optimal welfare together with the allocation that attains it.
         return max_welfare, argmax_allocation
 
-    def get_bundle_prices(self, quadratic=False) -> Tuple[Dict[Set[Good], pulp.LpAffineExpression], List[Dict[str, pulp.LpVariable]]]:
+    def get_bundle_prices(self, quadratic=False) -> Tuple[Dict[FrozenSet[Good], pulp.LpAffineExpression], List[Dict[str, pulp.LpVariable]]]:
         """
         Returns a map from bundle to pulp affine expressions that define the price of the bundle.
         TODO more flexible pricing structures, beyond just linear and quadratic.
@@ -208,15 +199,15 @@ class Market:
             quadra_prices = pulp.LpVariable.dicts('p', list(it.combinations(self._goods, 2)), lowBound=0.0)
 
         # Generate a map from bundle -> price of bundle. For now, the price of a bundle is linear or linear plus quadratic.
-        enumerated_bundle: Tuple[int, Set[Good]]
-        map_bundle_to_price: Dict[Set[Good], pulp.LpAffineExpression] = {}
-        for enumerated_bundle in self.get_all_enumerated_bundles():
-            lp_linear_prices = pulp.lpSum([linear_prices[good] for good in enumerated_bundle[1]])
+        map_bundle_to_price: Dict[FrozenSet[Good], pulp.LpAffineExpression] = {}
+        for bundle in Bidder.get_set_of_all_bundles(len(self._goods)):
+            bundle = frozenset(bundle)
+            lp_linear_prices = pulp.lpSum([linear_prices[good] for good in bundle])
             if quadratic:
-                lp_quadra_prices = pulp.lpSum([quadra_prices[pair] for pair in it.combinations(enumerated_bundle[1], 2)])
-                map_bundle_to_price[enumerated_bundle[1]] = lp_linear_prices + lp_quadra_prices
+                lp_quadra_prices = pulp.lpSum([quadra_prices[pair] for pair in it.combinations(bundle, 2)])
+                map_bundle_to_price[bundle] = lp_linear_prices + lp_quadra_prices
             else:
-                map_bundle_to_price[enumerated_bundle[1]] = lp_linear_prices
+                map_bundle_to_price[bundle] = lp_linear_prices
 
         return map_bundle_to_price, [linear_prices, quadra_prices]
 
@@ -235,26 +226,25 @@ class Market:
         model = pulp.LpProblem('Pricing_Problem', pulp.LpMaximize)
 
         # Get the prices for bundles.
-        map_bundle_to_price: Dict[Set[Good], pulp.LpAffineExpression]
+        map_bundle_to_price: Dict[Union[Tuple[Good], Set[Good], FrozenSet[Good]], pulp.LpAffineExpression]
         list_of_prices_vars: List[Dict[str, pulp.LpVariable]]
         map_bundle_to_price, list_of_prices_vars = self.get_bundle_prices(quadratic)
 
         # (1) Generate utility-maximization constraint for bidders.
-        enumerated_bundle: Tuple[int, Set[Good]]
         for bidder in self._bidders:
             value_for_allocated_bundle = bidder.value_query(allocation[bidder]) if bidder in allocation else 0.0
             price_for_allocated_bundle = map_bundle_to_price[allocation[bidder]] if bidder in allocation else 0.0
             # Generate utility-maximization for this bidder.
-            # An enumerated bundle is a tuple (int, bundle) where int is a unique integer in the range 0...2^n
-            for enumerated_bundle in self.get_all_enumerated_bundles():
-                value_of_bundle = bidder.value_query(enumerated_bundle[1])
-                price_of_bundle = map_bundle_to_price[enumerated_bundle[1]]
+            # @TODO should not enumerate all bundles but only those that are relevant, as now done in the welfare-max program.
+            for bundle in Bidder.get_set_of_all_bundles(len(self._goods)):
+                value_of_bundle = bidder.value_query(set(bundle))
+                price_of_bundle = map_bundle_to_price[bundle]
                 model += value_of_bundle - price_of_bundle <= value_for_allocated_bundle - price_for_allocated_bundle
 
         # (2) Generate revenue-maximization constraints for auctioneer, i.e., the revenue of the allocation must be greater than any other allocation.
         revenue = pulp.lpSum([map_bundle_to_price[bidder_alloc] for bidder_alloc in allocation.values()])
         for allocation in self.enumerate_all_allocations():
-            model += revenue >= pulp.lpSum([map_bundle_to_price[bundle] for bundle in allocation.values()])
+            model += revenue >= pulp.lpSum([map_bundle_to_price[frozenset(bundle)] for bundle in allocation.values()])
 
         # TODO the way the revenue constraints are generated can be optimized, as there are currently lots of redundant constraints
         """ 
