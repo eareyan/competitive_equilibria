@@ -40,7 +40,7 @@ def solve_lsvm_world(world_num):
         # Some debugging prints follow...
         # print(bidder['preferred_licences'])
         # print(bidder['id'], bidder['preferred_licences'], len(bidder['preferred_licences']), len(bidder['values']))
-        bidder_summary = [[bidder['id'], bidder['preferred_licences']]]
+        # bidder_summary = [[bidder['id'], bidder['preferred_licences']]]
         assert len(bidder['values']) == 2 ** len(bidder['preferred_licences'])
         value_function = {frozenset({Good(j) for j in map_bundle_values['bundle']}): map_bundle_values['value']
                           for map_bundle_values in bidder['values']}
