@@ -6,28 +6,16 @@ import numpy as np
 
 from market_constituents import NoisyBidder, Good, Bidder
 from market_inspector import MarketInspector
-from market_noisy import NoisyMarket
+from market_noisy import NoisyMarket, get_noise_generator
 
 
 class MyTestCase(unittest.TestCase):
 
     @staticmethod
-    def get_noise_generator():
-        a = -1
-        b = 1
-        c = b - a
-
-        # A uniform noise generator.
-        def noise_generator(num_samples):
-            return np.random.uniform(a, b, num_samples)
-
-        return noise_generator, c
-
-    @staticmethod
     def get_simple_noisy_market():
         set_of_goods = {Good(i) for i in range(0, 18)}
 
-        noise_generator, c = MyTestCase.get_noise_generator()
+        noise_generator, c = get_noise_generator()
         noisy_bidder_1 = NoisyBidder(0,
                                      {
                                          frozenset({Good(0)}): 1.0,
@@ -52,10 +40,16 @@ class MyTestCase(unittest.TestCase):
     @staticmethod
     def get_bigger_noisy_market():
         set_of_goods = {Good(i) for i in range(0, 18)}
-
+        # A small region for testing. Bigger regions follow.
+        size_of_region = [5, 4, 3, 5, 4]
         # size_of_region = [6, 7, 8, 11, 5]
-        size_of_region = [5, 6, 5, 6, 7]
-        noise_generator, c = MyTestCase.get_noise_generator()
+        # size_of_region = [5, 6, 5, 6, 7]
+        # size_of_region = [18, 6, 6, 7, 9, 9]
+        # size_of_region = [12, 6, 6, 7, 9, 9]
+        # size_of_region = [18, 11, 11, 11, 11, 11]
+        # size_of_region = [12, 6, 6, 6, 6, 6]
+        # size_of_region = [6, 6, 6, 6, 6, 6]
+        noise_generator, c = get_noise_generator()
         list_of_noisy_bidders = [NoisyBidder(i,
                                              {
                                                  bundle: len(bundle) * np.random.uniform(0, 10)
@@ -126,7 +120,7 @@ class MyTestCase(unittest.TestCase):
 
     def test_elicitation_algo(self):
         # Elicitation algorithm parameters.
-        noise_generator, c = self.get_noise_generator()
+        noise_generator, c = get_noise_generator()
 
         # Create the noisy market.
         set_of_goods = {Good(i) for i in range(0, 3)}

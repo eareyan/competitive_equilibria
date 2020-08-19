@@ -17,7 +17,7 @@ def check_ce(sm_market):
     linear_pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=False)
     # Try to compute non-linear CE prices.
     quadratic_pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
-    # Report results.
+    # Report worlds_results.
     return True if linear_pricing_result['status'] == 'Optimal' else False, True if quadratic_pricing_result['status'] == 'Optimal' else False
 
 
@@ -91,7 +91,7 @@ def run_experiment(total: int, input_path: str, output_path: str, number_of_part
     df = df.withColumn('clearing', my_udf(*cols))
     new_cols = cols + ['clearing.linear_clears', 'clearing.quadratic_clears']
 
-    # Write the results of the experiments.
+    # Write the worlds_results of the experiments.
     df = df.select(*new_cols)
     df.write.mode('overwrite').parquet(sm_market_output_parquet_loc)
     df.printSchema()

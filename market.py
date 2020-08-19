@@ -58,6 +58,8 @@ class Market:
             for bidder in self._bidders:
                 for bundle in bidder.get_base_bundles():
                     var = pulp.LpVariable(f"allocation_{bidder}_{bundle}", lowBound=0, upBound=1, cat='Integer')
+                    # TODO: What if we solve the LP as a bound to the ILP for pruning purposes? Does not seem to work great...
+                    # var = pulp.LpVariable(f"allocation_{bidder}_{bundle}", lowBound=0, upBound=1, cat='Continuous')
                     if bidder not in bidders_vars:
                         bidders_vars[bidder] = []
                     bidders_vars[bidder] += [var]
@@ -215,10 +217,10 @@ class Market:
         """
         Solve the competitive equilibria pricing LP.
         :param allocation: a dictionary mapping a bidder to a set of goods. If the bidder is not in the map, it was not in the allocation.
-        :param quadratic:
-        :return:
+        :param quadratic: a boolean indicating whether quadratic prices are included in the solver.
+        :return: a dictionary with various pieces of data about the solver and its solution.
         """
-        # Collect results and start timer for profiling purposes.
+        # Collect worlds_results and start timer for profiling purposes.
         result = {}
         t0_initial = time.time()
 
@@ -286,6 +288,9 @@ class Market:
 
     @staticmethod
     def __enumerate_all_allocations_helper(goods, bidders, allocation):
+        """
+        Helper for enumerate_all_allocations function.
+        """
         # Leaf node, return the current allocation.
         if len(bidders) == 0:
             return [allocation.copy()]

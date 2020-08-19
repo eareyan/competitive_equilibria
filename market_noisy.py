@@ -1,14 +1,26 @@
-import itertools as it
 import math
-import pprint
 import time
 from typing import Set, FrozenSet, List, Tuple
 
+import numpy as np
+import pandas as pd
 import pulp
 from pkbar import pkbar
 
 from market import Market
 from market_constituents import Good, Bidder, NoisyBidder
+
+
+def get_noise_generator():
+    a = -1
+    b = 1
+    c = b - a
+
+    # A uniform noise generator.
+    def noise_generator(num_samples):
+        return np.random.uniform(a, b, num_samples)
+
+    return noise_generator, c
 
 
 class NoisyMarket(Market):
@@ -24,10 +36,10 @@ class NoisyMarket(Market):
 
     def elicit(self, number_of_samples: int, delta: float, c: float) -> float:
         """
-        :param number_of_samples:
-        :param delta:
-        :param c:
-        :return:
+        :param number_of_samples: how many samples per active bidder, bundle pair.
+        :param delta: the failure probability.
+        :param c: the noise range.
+        :return: epsilon, the width of the confidence interval over all active bidder, bundle pairs. .
         """
         # TODO: calculate epsilon as a function of delta and number_of_samples. For now, only Hoeffding's inequality, but how could this be generalized?
         epsilon: float = c * math.sqrt((math.log((2.0 * len(self._active_consumer_bundle_pair)) / delta)) / (2.0 * number_of_samples))
@@ -42,15 +54,17 @@ class NoisyMarket(Market):
 
     def elicit_with_pruning(self, sampling_schedule: List[int], delta_schedule: List[float], target_epsilon: float, c: float):
         """
-        :param sampling_schedule:
-        :param delta_schedule:
-        :param target_epsilon:
-        :param c:
+        :param sampling_schedule: a sequence of increase integers, each integer equal to the number of samples for the corresponding iteration.
+        :param delta_schedule: a sequence of floats, each in the range (0, 1) and whose sum is in (0, 1), each denoting the probability for each iteration.
+        :param target_epsilon: the desired final epsilon.
+        :param c: the range of the noise when sampling bidders' values.
+        :return: a dictionary with various pieces of data about the run of the algorithm.
         """
         assert len(sampling_schedule) == len(delta_schedule) and target_epsilon > 0
         t0 = time.time()
         # Construct a dictionary with all the data we want to report back.
-        result = {'sampling_schedule': sampling_schedule,
+        result = {'market': self,
+                  'sampling_schedule': sampling_schedule,
                   'delta_schedule': delta_schedule,
                   'target_epsilon': target_epsilon,
                   'c': c}
@@ -90,3 +104,68 @@ class NoisyMarket(Market):
             # Record statistics.
             result[t] = {'_active_consumer_bundle_pair': self._active_consumer_bundle_pair,
                          'prune_set': prune_set}
+
+    @staticmethod
+    def eap_output_to_dataframes(result, folder_location):
+        """
+        Given the result of elicit_with_pruning, saves various .csv files with log data.
+        """
+
+        # Parameters of the run
+        params_df = pd.DataFrame(
+            [
+                ['sampling_schedule', result['sampling_schedule']],
+                ['delta_schedule', result['delta_schedule']],
+                ['target_epsilon', result['target_epsilon']],
+                ['c', result['c']],
+                ['time', result['time']],
+                ['total_num_iterations', result['total_num_iterations']],
+                ['actual_eps', result['actual_eps']],
+            ],
+            columns=['parameter',
+                     'value'],
+            index=None)
+        params_df.to_csv(f"{folder_location}params.csv", index=False)
+
+        # Summary of the evolution of pruning.
+        pruning_evolution_summary_df = pd.DataFrame(
+            [
+                [t,
+                 len(result[t]['_active_consumer_bundle_pair']),
+                 len(result[t]['prune_set'])] for t in range(0, result['total_num_iterations'] - 1)
+            ],
+            columns=['end_of_iteration',
+                     'active',
+                     'pruned'],
+            index=None)
+        pruning_evolution_summary_df.to_csv(f"{folder_location}pruning_evolution_summary.csv", index=False)
+
+        # Detail of the evolution of pruning.
+        pruning_evolution_detail = []
+        for t in range(0, result['total_num_iterations'] - 1):
+            for bidder in result['market'].get_bidders():
+                for bundle in bidder.get_base_bundles():
+                    # print(bidder, bundle, (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair'])
+                    pruning_evolution_detail += [[t, bidder.get_id(), [good.get_id() for good in bundle], (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair']]]
+        pruning_evolution_detail_df = pd.DataFrame(pruning_evolution_detail,
+                                                   columns=['iteration', 'bidder', 'bundle', 'active'],
+                                                   index=None)
+        pruning_evolution_detail_df.to_csv(f"{folder_location}pruning_evolution_detail.csv", index=False)
+
+        # Final values of bidders.
+        bidder_final_values = []
+        for noisy_bidder in result['market'].get_bidders():
+            for bundle in noisy_bidder.get_base_bundles():
+                avg, eps, actual_num_samples = noisy_bidder.get_current_empirical_values(bundle)
+                bidder_final_values += [[noisy_bidder.get_id(), [good.get_id() for good in bundle], avg, eps, avg - eps, avg + eps, actual_num_samples]]
+
+        bidders_final_values_df = pd.DataFrame(bidder_final_values,
+                                               columns=['bidder',
+                                                        'bundle',
+                                                        'avg',
+                                                        'eps',
+                                                        'avg-eps',
+                                                        'avg+eps',
+                                                        'n'],
+                                               index=None)
+        bidders_final_values_df.to_csv(f"{folder_location}bidders_final_values.csv", index=False)
