@@ -1,9 +1,9 @@
 import json
 import os
+
 import pandas as pd
 
 from market_constituents import NoisyBidder, Good
-from market_inspector import MarketInspector
 from market_noisy import NoisyMarket, get_noise_generator
 
 
@@ -47,7 +47,7 @@ def solve_lsvm_world(world_num):
         map_of_bidders[bidder['id']] = NoisyBidder(bidder['id'], value_function, my_noise_generator)
 
     # Construct the market object. The LSVM model has 18 goods.
-    noisy_market = NoisyMarket({Good(i) for i in range(0, 18)}, set(map_of_bidders.values()))
+    noisy_market = NoisyMarket({Good(j) for j in range(0, 18)}, set(map_of_bidders.values()))
 
     # Test elicitation algo
     # noisy_market.elicit(number_of_samples=100,
@@ -56,8 +56,8 @@ def solve_lsvm_world(world_num):
     # print(list(noisy_market.get_bidders())[0].value_query(frozenset({Good(2)})))
 
     # Run elicitation with pruning (EAP).
-    result_eap = noisy_market.elicit_with_pruning(sampling_schedule=[10 ** i for i in range(1, 5)],
-                                                  delta_schedule=[1.0 / 4 for _ in range(1, 5)],
+    result_eap = noisy_market.elicit_with_pruning(sampling_schedule=[10 ** k for k in range(1, 5)],
+                                                  delta_schedule=[0.1 / 4 for _ in range(1, 5)],
                                                   target_epsilon=0.0001,
                                                   # target_epsilon=0.1,
                                                   c=my_c)
