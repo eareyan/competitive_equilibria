@@ -7,26 +7,28 @@ from market_constituents import NoisyBidder, Good
 from market_noisy import NoisyMarket, get_noise_generator
 
 
-def solve_lsvm_world(world_num):
+def solve_lsvm_world(json_world_loc, results_folder):
+    """
+    Reads in a LSVM world and saves various .csv files with infor about elicitation with pruning.
+    :param json_world_loc: the location of a json file defining a LSVM market.
+    :param results_folder: the folder where to store results, i.e., various .csv files.
+    """
     # For debugging:
     # lsvm_json_loc = '/Users/enriqueareyan/Documents/workspace/noisy_combinatorial_markets/default.json'
 
-    # Check if the world was already solved before
-    base_folder_location = 'LSVM/'
-    results_folder = f"{base_folder_location}worlds_results/word{world_num}/"
+    # Read JSON file with LSVM model.
+    with open(json_world_loc) as f:
+        data = json.load(f)
+
+    # Check if the results folder exists. Created if not.
     if os.path.exists(results_folder):
-        print(f"\n World #{world_num} already solved... ")
+        print(f"\n World {json_world_loc} already solved... ")
         return
     else:
-        print(f"\nSolving World #{world_num}")
+        print(f"\nSolving World {json_world_loc}")
         # Safe create the folder location.
         if not os.path.exists(results_folder):
             os.makedirs(results_folder)
-
-    # Read JSON file with LSVM model.
-    lsvm_json_loc = f'{base_folder_location}worlds/world{world_num}.json'
-    with open(lsvm_json_loc) as f:
-        data = json.load(f)
 
     # Parse LSVM model into a market.
     map_of_bidders = {}
@@ -41,6 +43,7 @@ def solve_lsvm_world(world_num):
         # print(bidder['preferred_licences'])
         # print(bidder['id'], bidder['preferred_licences'], len(bidder['preferred_licences']), len(bidder['values']))
         # bidder_summary = [[bidder['id'], bidder['preferred_licences']]]
+        # Just making sure that the value function is of the right length, i.e., all subsets of the preferred licenses.
         assert len(bidder['values']) == 2 ** len(bidder['preferred_licences'])
         value_function = {frozenset({Good(j) for j in map_bundle_values['bundle']}): map_bundle_values['value']
                           for map_bundle_values in bidder['values']}
@@ -81,6 +84,11 @@ def solve_lsvm_world(world_num):
 
 
 if __name__ == "__main__":
+    # Check if the world was already solved before
+    the_base_folder_location = 'LSVM/experiments/2/'
+
     # Run as many worlds as possible..
     for i in range(0, 100):
-        solve_lsvm_world(i)
+        the_results_folder = f"{the_base_folder_location}worlds_results/world{i}/"
+        the_world_loc = f'{the_base_folder_location}worlds/world{i}.json'
+        solve_lsvm_world(json_world_loc=the_world_loc, results_folder=the_results_folder)
