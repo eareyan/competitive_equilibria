@@ -1,5 +1,4 @@
 from prettytable import PrettyTable
-import itertools as it
 
 
 class MarketInspector:
