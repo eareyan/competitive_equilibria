@@ -1,0 +1,150 @@
+{
+  "LSVM_A": 320,
+  "LSVM_B": 10,
+  "proximity": [
+    {
+      "rowPosition": 0,
+      "columnPosition": 0,
+      "id": 0,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 1,
+      "id": 1,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 2,
+      "id": 2,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 3,
+      "id": 3,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 4,
+      "id": 4,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 5,
+      "id": 5,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 0,
+      "id": 6,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 1,
+      "id": 7,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 2,
+      "id": 8,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 3,
+      "id": 9,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 4,
+      "id": 10,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 5,
+      "id": 11,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 0,
+      "id": 12,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 1,
+      "id": 13,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 2,
+      "id": 14,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 3,
+      "id": 15,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 4,
+      "id": 16,
+      "worldId": 5
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 5,
+      "id": 17,
+      "worldId": 5
+    }
+  ],
+  "values": {
+    "0": 4.4287940700926018422478591674007475376129150390625,
+    "1": 8.0607176960094850670657251612283289432525634765625,
+    "2": 4.87162171653038367225008187233470380306243896484375,
+    "3": 3.68314681298536417131117559620179235935211181640625,
+    "4": 7.75177680356819553963987345923669636249542236328125,
+    "5": 4.4628463846342327769889379851520061492919921875,
+    "6": 8.43640318506475495041740941815078258514404296875,
+    "7": 5.17340820096774844927267622551880776882171630859375,
+    "8": 3.56057455306217729429363316739909350872039794921875,
+    "9": 5.485321560043363575687180855311453342437744140625,
+    "10": 8.2853972226112517773799481801688671112060546875,
+    "11": 3.5631922185153310778105151257477700710296630859375,
+    "12": 4.04901412590529741208911218564026057720184326171875,
+    "13": 8.308368252603475667683596839196979999542236328125,
+    "14": 7.88545219964908739029851858504116535186767578125,
+    "15": 7.9651574533382021314764642738737165927886962890625,
+    "16": 5.27928090943173611293559588375501334667205810546875,
+    "17": 4.7291347631263480622010320075787603855133056640625
+  },
+  "setupType": "National Bidder Setup",
+  "population": 0,
+  "id": 0,
+  "worldId": 5,
+  "setup": {
+    "valueInterval": {
+      "minValue": 3.0,
+      "maxValue": 9.0
+    },
+    "proximitySize": -1,
+    "a": 320,
+    "b": 10,
+    "setupName": "National Bidder Setup",
+    "numberOfBidders": 1
+  },
+  "implementation": "org.spectrumauctions.sats.core.model.lsvm.LSVMBidder"
+}

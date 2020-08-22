@@ -1,0 +1,87 @@
+{
+  "LSVM_A": 160,
+  "LSVM_B": 4,
+  "proximity": [
+    {
+      "rowPosition": 1,
+      "columnPosition": 3,
+      "id": 9,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 4,
+      "id": 10,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 2,
+      "id": 8,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 5,
+      "id": 5,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 3,
+      "id": 3,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 4,
+      "id": 4,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 1,
+      "id": 1,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 2,
+      "id": 2,
+      "worldId": 35
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 3,
+      "id": 15,
+      "worldId": 35
+    }
+  ],
+  "values": {
+    "1": 6.429006496362543288114466122351586818695068359375,
+    "2": 13.15848469767155393128632567822933197021484375,
+    "3": 9.913649696719748050099951797164976596832275390625,
+    "4": 9.089881752754035204588944907300174236297607421875,
+    "5": 10.310304527063461677016675821505486965179443359375,
+    "8": 4.70398451467331302211505317245610058307647705078125,
+    "9": 16.494857123399636833482873043976724147796630859375,
+    "10": 7.66544845769107041633105836808681488037109375,
+    "15": 8.2690261034022487507400001049973070621490478515625
+  },
+  "setupType": "Regional Bidder Setup",
+  "population": 0,
+  "id": 1,
+  "worldId": 35,
+  "setup": {
+    "valueInterval": {
+      "minValue": 3.0,
+      "maxValue": 20.0
+    },
+    "proximitySize": 2,
+    "a": 160,
+    "b": 4,
+    "setupName": "Regional Bidder Setup",
+    "numberOfBidders": 5
+  },
+  "implementation": "org.spectrumauctions.sats.core.model.lsvm.LSVMBidder"
+}

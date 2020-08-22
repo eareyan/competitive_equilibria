@@ -1,0 +1,94 @@
+{
+  "LSVM_A": 160,
+  "LSVM_B": 4,
+  "proximity": [
+    {
+      "rowPosition": 2,
+      "columnPosition": 0,
+      "id": 12,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 3,
+      "id": 9,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 1,
+      "id": 7,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 2,
+      "id": 8,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 1,
+      "columnPosition": 0,
+      "id": 6,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 1,
+      "id": 1,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 2,
+      "id": 2,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 0,
+      "columnPosition": 0,
+      "id": 0,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 1,
+      "id": 13,
+      "worldId": 17
+    },
+    {
+      "rowPosition": 2,
+      "columnPosition": 2,
+      "id": 14,
+      "worldId": 17
+    }
+  ],
+  "values": {
+    "0": 14.1566752498621095668340785778127610683441162109375,
+    "1": 6.3487743792030197909070921014063060283660888671875,
+    "2": 9.5694635917129033941819216124713420867919921875,
+    "6": 6.6273272781979475354319220059551298618316650390625,
+    "7": 7.6476437593366402012406979338265955448150634765625,
+    "8": 17.260231047877670818024853360839188098907470703125,
+    "9": 17.921838880382164660431953961960971355438232421875,
+    "12": 5.47124303044305548837655805982649326324462890625,
+    "13": 8.77876336398721690557067631743848323822021484375,
+    "14": 4.3728939834666658015294160577468574047088623046875
+  },
+  "setupType": "Regional Bidder Setup",
+  "population": 0,
+  "id": 3,
+  "worldId": 17,
+  "setup": {
+    "valueInterval": {
+      "minValue": 3.0,
+      "maxValue": 20.0
+    },
+    "proximitySize": 2,
+    "a": 160,
+    "b": 4,
+    "setupName": "Regional Bidder Setup",
+    "numberOfBidders": 5
+  },
+  "implementation": "org.spectrumauctions.sats.core.model.lsvm.LSVMBidder"
+}
