@@ -9,17 +9,8 @@ from market import Market, Bidder
 class Additive(Bidder):
     """ Represents an additive bidder, i.e., its value for a bundle is given by summing the the values of the goods in the bundle."""
 
-    def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
-        super().__init__(bidder_id, Bidder.get_set_of_all_bundles(len(goods)))
-        self._values = {good: random.randint(1, 10) for good in goods} if random_init else None
-
-    def set_values(self, values: Dict[int, float]):
-        """
-        Sets the values. Throws an exception in case the values were previously set.
-        :param values: the bidder's values, a dictionary from Goods to float.
-        """
-        if self._values is not None:
-            raise Exception("Cannot re-set the values of an AWB bidder.")
+    def __init__(self, bidder_id: int, values: Dict[int, float]):
+        super().__init__(bidder_id, Bidder.get_set_of_all_bundles(len(values.keys())))
         self._values = values
 
     def get_good_value(self, good: int):
@@ -37,6 +28,15 @@ class Additive(Bidder):
         :return: the value of the bidder.
         """
         return sum([self._values[good] for good in bundle])
+
+    @staticmethod
+    def draw_random_additive_bidder(bidder_id: int, set_of_goods: Set[int]):
+        """
+        Draws an additive bidder with a random set of values.
+        :return: an Additive bidder.
+        """
+        return Additive(bidder_id=bidder_id,
+                        values={good: random.randint(1, 10) for good in set_of_goods})
 
     @staticmethod
     def get_pretty_representation(additive_market):
@@ -62,19 +62,11 @@ class AdditiveWithBudget(Additive):
     Paper reference: Combinatorial auctions with decreasing marginal utilities.
     https://dl.acm.org/doi/pdf/10.1145/501158.501161 """
 
-    def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
-        super().__init__(bidder_id, goods, False)
-        self._budget = random.randint(1, 10) if random_init else None
-        self._values = {good: random.randint(1, 10) for good in goods} if random_init else None
-
-    def set_budget(self, budget: float):
-        """
-        Sets the budget. Throws exception in case the budget was previously set.
-        :param budget: the bidder's budget, a float
-        """
-        if self._budget is not None:
-            raise Exception("Cannot re-set the budget of an AWB bidder.")
+    def __init__(self, bidder_id: int, values: Dict[int, float], budget: float):
+        super().__init__(bidder_id, values)
         self._budget = budget
+        # self._budget = random.randint(1, 10) if random_init else None
+        # self._values = {good: random.randint(1, 10) for good in goods} if random_init else None
 
     def get_budget(self):
         """
@@ -91,6 +83,16 @@ class AdditiveWithBudget(Additive):
         :return: the value of the bidder.
         """
         return min(super().value_query(bundle), self._budget)
+
+    @staticmethod
+    def draw_random_awb_bidder(bidder_id: int, set_of_goods: Set[int]):
+        """
+        Draws an additive with budget bidder with a random set of values and a random budget.
+        :return: an AdditiveWithBudget bidder.
+        """
+        return AdditiveWithBudget(bidder_id=bidder_id,
+                                  values={good: random.randint(1, 10) for good in set_of_goods},
+                                  budget=random.randint(1, 10))
 
     @staticmethod
     def get_pretty_representation(awb_market):
@@ -142,6 +144,16 @@ class SingleMinded(Bidder):
         """
         # If its my desired bundle, return value, else 0
         return self._value if self._preferred_bundle.issubset(bundle) else 0.0
+
+    @staticmethod
+    def draw_random_sm_bidder(bidder_id: int, set_of_goods: Set[int]):
+        """
+        Draws a random SingleMinded bidder.
+        :return: a SingleMinded bidder.
+        """
+        return SingleMinded(bidder_id=bidder_id,
+                            preferred_bundle=frozenset(random.sample(set_of_goods, random.randint(1, len(set_of_goods)))),
+                            value=random.randint(1, 10))
 
     @staticmethod
     def get_mathematica_plot(sm_market, good_prefix='G', bidder_prefix='B', separation=0.5, vertex_size=0.25, font_size=20):

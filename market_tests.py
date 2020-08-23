@@ -2,10 +2,10 @@ import itertools as it
 import unittest
 from typing import Set
 
-import market_inspector
 from pkbar import pkbar
 
 import bidders
+import market_inspector
 from market import Market, Bidder
 
 
@@ -16,7 +16,7 @@ class MyTestCase(unittest.TestCase):
         A simple market for debugging purposes.
         :return: a market.
         """
-        set_of_goods = {i for i in range(0, 5)}
+        set_of_goods = {j for j in range(0, 5)}
 
         class ConstantValueBidder(Bidder):
             def value_query(self, bundle: Set[int]) -> float:
@@ -67,8 +67,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_welfare_max_ilp_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the ilp. """
-        set_of_goods = {i for i in range(0, 10)}
-        set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 10)}
+        set_of_goods = {j for j in range(0, 10)}
+        set_of_bidders = {bidders.AdditiveWithBudget.draw_random_awb_bidder(i, set_of_goods) for i in range(0, 10)}
         market = Market(set_of_goods, set_of_bidders)
         # print(bidders.AdditiveWithBudget.get_pretty_representation(market))
 
@@ -82,8 +82,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_brute_force_solve_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the brute force solver. """
-        set_of_goods = {i for i in range(0, 5)}
-        set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 5)}
+        set_of_goods = {j for j in range(0, 5)}
+        set_of_bidders = {bidders.AdditiveWithBudget(bidder_id=i, values={j: 1 for j in set_of_goods}, budget=1) for i in range(0, 5)}
         awb_market = Market(set_of_goods, set_of_bidders)
 
         welfare_brute_force, allocation_brute_force = awb_market.brute_force_welfare_max_solver()
@@ -98,7 +98,9 @@ class MyTestCase(unittest.TestCase):
         trials_per_configuration = 10
         up_to_goods = 6
         up_to_bidders = 6
-        types_of_bidders = [bidders.Additive, bidders.AdditiveWithBudget]
+        types_of_bidders = [bidders.Additive.draw_random_additive_bidder,
+                            bidders.AdditiveWithBudget.draw_random_awb_bidder,
+                            bidders.SingleMinded.draw_random_sm_bidder]
         progress_bar = pkbar.Pbar(name='Testing many welfare max. allocations', target=trials_per_configuration * len(types_of_bidders) * (up_to_goods - 1) * (up_to_bidders - 1))
         k = 0
         for t, bidder_type, number_of_goods, number_of_bidders in it.product(range(0, trials_per_configuration),
@@ -108,7 +110,7 @@ class MyTestCase(unittest.TestCase):
             progress_bar.update(k)
             k = k + 1
             # Create a random market with AWB valuations.
-            set_of_goods = {i for i in range(0, number_of_goods)}
+            set_of_goods = {j for j in range(0, number_of_goods)}
             set_of_awb_bidders = {bidder_type(i, set_of_goods) for i in range(0, number_of_bidders)}
             market = Market(set_of_goods, set_of_awb_bidders)
 
@@ -118,11 +120,9 @@ class MyTestCase(unittest.TestCase):
             # Solve for the WMA via the ILP.
             welfare_max_result_ilp = market.welfare_max_program()
 
-            # print(f"trial #{t}, number_of_goods = {number_of_goods}, "
-            #       f"bidder_type = {bidder_type}, "
-            #       f"number_of_awb_bidders = {number_of_bidders}, "
-            #       f"brute force = {welfare_brute_force}, "
-            #       f"ilp = {welfare_max_result_ilp['optimal_welfare']}")
+            # Some prints
+            # print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+            # print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
 
             self.assertEqual(welfare_brute_force, welfare_max_result_ilp['optimal_welfare'])
 
@@ -143,13 +143,9 @@ class MyTestCase(unittest.TestCase):
         """
         set_of_goods = {0, 1, 2}
 
-        awb_bidder_0 = bidders.AdditiveWithBudget(0, set_of_goods, random_init=False)
-        awb_bidder_0.set_budget(7)
-        awb_bidder_0.set_values({0: 1, 1: 4, 2: 5})
+        awb_bidder_0 = bidders.AdditiveWithBudget(bidder_id=0, values={0: 1, 1: 4, 2: 5}, budget=7)
 
-        awb_bidder_1 = bidders.AdditiveWithBudget(1, set_of_goods, random_init=False)
-        awb_bidder_1.set_budget(5)
-        awb_bidder_1.set_values({0: 3, 1: 10, 2: 1})
+        awb_bidder_1 = bidders.AdditiveWithBudget(bidder_id=1, values={0: 3, 1: 10, 2: 1}, budget=5)
 
         example_awb_market = Market(set_of_goods, {awb_bidder_0, awb_bidder_1})
         # print(bidders.AdditiveWithBudget.get_pretty_representation(example_awb_market))
@@ -176,8 +172,8 @@ class MyTestCase(unittest.TestCase):
         for t in range(0, n):
             progress_bar.update(t)
             # Draw a random additive market
-            set_of_goods = {i for i in range(0, 5)}
-            set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
+            set_of_goods = {j for j in range(0, 5)}
+            set_of_bidders = {bidders.Additive.draw_random_additive_bidder(i, set_of_goods) for i in range(0, 3)}
             simple_market = Market(set_of_goods, set_of_bidders)
             # print(bidders.Additive.get_pretty_representation(simple_market))
 
@@ -203,8 +199,8 @@ class MyTestCase(unittest.TestCase):
         print("This is a probabilistic search, no ETA available...")
         while status == 'Optimal':
             # Draw a random market.
-            set_of_goods = {i for i in range(0, 3)}
-            set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 3)}
+            set_of_goods = {j for j in range(0, 3)}
+            set_of_bidders = {bidders.AdditiveWithBudget.draw_random_awb_bidder(i, set_of_goods) for i in range(0, 3)}
             awb_market = Market(set_of_goods, set_of_bidders)
             # print(bidders.AdditiveWithBudget.get_pretty_representation(awb_market))
 
@@ -240,8 +236,8 @@ class MyTestCase(unittest.TestCase):
 
         # Solve for the welfare-maximizing allocation.
         welfare_max_result_ilp = sm_market.welfare_max_program()
-        # print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-        # print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        # print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        # print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
 
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 10.0)
 
@@ -250,8 +246,8 @@ class MyTestCase(unittest.TestCase):
         print(market_inspector.pretty_print_pricing(pricing_result))
 
     def test_additive_non_linear_pricing_lp(self):
-        set_of_goods = {i for i in range(0, 3)}
-        set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
+        set_of_goods = {j for j in range(0, 3)}
+        set_of_bidders = {bidders.Additive.draw_random_additive_bidder(i, set_of_goods) for i in range(0, 3)}
         additive_market = Market(set_of_goods, set_of_bidders)
         print(bidders.Additive.get_pretty_representation(additive_market))
 
@@ -271,8 +267,8 @@ class MyTestCase(unittest.TestCase):
     def test_enumerate_all_allocations(self):
 
         # Generate a random additive market.
-        set_of_goods = {i for i in range(0, 3)}
-        set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
+        set_of_goods = {j for j in range(0, 3)}
+        set_of_bidders = {bidders.Additive(bidder_id=i, values={j: None for j in set_of_goods}) for i in range(0, 3)}
         additive_market = Market(set_of_goods, set_of_bidders)
         # print(bidders.Additive.get_pretty_representation(additive_market))
 

@@ -11,9 +11,8 @@ class MyTestCase(unittest.TestCase):
 
     def test_additive_bidders(self):
         """ Testing additive bidders. """
-        set_of_goods = {i for i in range(0, 5)}
-        additive_bidder_0 = bidders.Additive(0, set_of_goods, random_init=False)
-        additive_bidder_0.set_values({good: 1 for good in set_of_goods})
+        set_of_goods = {j for j in range(0, 5)}
+        additive_bidder_0 = bidders.Additive(0, {good: 1 for good in set_of_goods})
         additive_market = Market(goods=set_of_goods, bidders={additive_bidder_0})
         print(bidders.Additive.get_pretty_representation(additive_market))
         for good in set_of_goods:
@@ -22,12 +21,8 @@ class MyTestCase(unittest.TestCase):
     def test_awb_bidders(self):
         """ Testing additive with budget bidders"""
         set_of_goods = {i for i in range(0, 2)}
-        awb_bidder_0 = bidders.AdditiveWithBudget(0, set_of_goods, random_init=False)
-        awb_bidder_0.set_values({good: 1 for good in set_of_goods})
-        awb_bidder_0.set_budget(1)
-        awb_bidder_1 = bidders.AdditiveWithBudget(1, set_of_goods, random_init=False)
-        awb_bidder_1.set_values({good: 2 for good in set_of_goods})
-        awb_bidder_1.set_budget(2)
+        awb_bidder_0 = bidders.AdditiveWithBudget(0, {good: 1 for good in set_of_goods}, 1)
+        awb_bidder_1 = bidders.AdditiveWithBudget(1, {good: 2 for good in set_of_goods}, 2)
         awb_market = Market(goods=set_of_goods, bidders={awb_bidder_0, awb_bidder_1})
         print(bidders.AdditiveWithBudget.get_pretty_representation(awb_market))
 
