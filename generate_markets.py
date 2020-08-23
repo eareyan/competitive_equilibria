@@ -5,7 +5,6 @@ from pyspark.sql.functions import udf, explode
 from pyspark.sql.types import StructType, StructField, ArrayType, StringType, IntegerType
 from bidders import SingleMinded
 from market import Market
-from market_constituents import Good
 from typing import List
 import itertools as it
 import sys
@@ -29,7 +28,7 @@ def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
     :return: a single-minded market
     """
     # Create the goods
-    map_of_goods = {i: Good(i) for i in eval(graph_goods)}
+    map_of_goods = {i: i for i in eval(graph_goods)}
     set_of_goods = set(map_of_goods.values())
 
     # Create the bidders - just their ids, we will populate their preferred sets and values later.
@@ -98,7 +97,7 @@ def generate_market_values(*args, support_values: List[int] = None):
     # Build the market.
     num_bidders = int(args[NUM_BIDDERS_INDEX])
     num_goods = int(args[NUM_GOODS_INDEX])
-    list_of_goods = [Good(i) for i in range(0, num_goods)]
+    list_of_goods = [i for i in range(0, num_goods)]
     set_of_goods = set(list_of_goods)
     set_of_bidders = set()
     for i in range(1, num_bidders + 1):

@@ -3,14 +3,13 @@ from typing import Set, Dict
 
 from prettytable import PrettyTable
 
-from market import Market
-from market_constituents import Good, Bidder
+from market import Market, Bidder
 
 
 class Additive(Bidder):
     """ Represents an additive bidder, i.e., its value for a bundle is given by summing the the values of the goods in the bundle."""
 
-    def __init__(self, bidder_id: int, goods: Set[Good], random_init=True):
+    def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
         super().__init__(bidder_id, Bidder.get_set_of_all_bundles(len(goods)))
         if random_init:
             self._values = {}
@@ -19,7 +18,7 @@ class Additive(Bidder):
         else:
             self._values = None
 
-    def set_values(self, values: Dict[Good, float]):
+    def set_values(self, values: Dict[int, float]):
         """
         Sets the values. Throws an exception in case the values were previously set.
         :param values: the bidder's values, a dictionary from Goods to float.
@@ -28,7 +27,7 @@ class Additive(Bidder):
             raise Exception("Cannot re-set the values of an AWB bidder.")
         self._values = values
 
-    def get_good_value(self, good: Good):
+    def get_good_value(self, good: int):
         """
         Getter.
         :param good: a good
@@ -36,7 +35,7 @@ class Additive(Bidder):
         """
         return self._values[good]
 
-    def value_query(self, bundle: Set[Good]) -> float:
+    def value_query(self, bundle: Set[int]) -> float:
         """
         An additive bidder's value for a bundle is given by adding the values of the goods in the bundle.
         :param bundle: a bundle of goods.
@@ -68,7 +67,7 @@ class AdditiveWithBudget(Additive):
     Paper reference: Combinatorial auctions with decreasing marginal utilities.
     https://dl.acm.org/doi/pdf/10.1145/501158.501161 """
 
-    def __init__(self, bidder_id: int, goods: Set[Good], random_init=True):
+    def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
         super().__init__(bidder_id, goods, False)
         if random_init:
             self._budget = random.randint(1, 10)
@@ -93,7 +92,7 @@ class AdditiveWithBudget(Additive):
         """
         return self._budget
 
-    def value_query(self, bundle: Set[Good]) -> float:
+    def value_query(self, bundle: Set[int]) -> float:
         """
         The value of an additive with budget bidder for a bundle is the minimum between
         the sum of the values in the bundle and the bidder's budget.
@@ -124,7 +123,7 @@ class AdditiveWithBudget(Additive):
 class SingleMinded(Bidder):
     """ Represents a single-minded bidder. """
 
-    def __init__(self, bidder_id: int, goods: Set[Good], random_init=True):
+    def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
         super().__init__(bidder_id, None)
         if random_init:
             self._preferred_bundle = set(random.sample(goods, random.randint(1, len(goods))))
@@ -134,7 +133,7 @@ class SingleMinded(Bidder):
             self._preferred_bundle = None
             self._value = None
 
-    def set_preferred_bundle(self, preferred_bundle: Set[Good]):
+    def set_preferred_bundle(self, preferred_bundle: Set[int]):
         """
         Setter.
         :param preferred_bundle: a bundle of goods, i.e., a set of goods.
@@ -168,7 +167,7 @@ class SingleMinded(Bidder):
         """
         return self._value
 
-    def value_query(self, bundle: Set[Good]) -> float:
+    def value_query(self, bundle: Set[int]) -> float:
         """
         A single-minded bidder responds to a value query for a bundle with its value in case the bundle
         contains its preferred bundle. Otherwise, the value is 0.
@@ -188,16 +187,16 @@ VertexLabels->{1->"1", x->"x", y->"y"}]
         """
         list_of_goods = list(sm_market.get_goods())
         list_of_bidders = list(sm_market.get_bidders())
-        edges = ','.join([f"{good_prefix}{good.get_id()} <-> {bidder_prefix}{bidder.get_id()}"
+        edges = ','.join([f"{good_prefix}{good} <-> {bidder_prefix}{bidder.get_id()}"
                           for bidder in list_of_bidders
                           for good in bidder.get_preferred_bundle()])
-        vertex_coordinates = ','.join([f"{good_prefix}{good.get_id()}" + "->{0, " + str((good.get_id() * separation) + (separation / 2.0)) + "}"
+        vertex_coordinates = ','.join([f"{good_prefix}{good}" + "->{0, " + str((good * separation) + (separation / 2.0)) + "}"
                                        for good in list_of_goods])
         vertex_coordinates += "," + ','.join([f"{bidder_prefix}{bidder.get_id()}" + "->{0.5, " + str(bidder.get_id() * separation) + "}"
                                               for bidder in list_of_bidders])
-        vertex_labels = ','.join([f"{good_prefix}{good.get_id()}-> {good_prefix}{good.get_id()}" for good in list_of_goods])
+        vertex_labels = ','.join([f"{good_prefix}{good}-> {good_prefix}{good}" for good in list_of_goods])
         vertex_labels += "," + ','.join([f"{bidder_prefix}{bidder.get_id()}-> {bidder_prefix}{bidder.get_id()} : {bidder.get_value_preferred_bundle()}" for bidder in list_of_bidders])
-        vertex_style = ','.join([f"{good_prefix}{good.get_id()} -> Gray" for good in list_of_goods])
+        vertex_style = ','.join([f"{good_prefix}{good} -> Gray" for good in list_of_goods])
         vertex_style += "," + ','.join([f"{bidder_prefix}{bidder.get_id()} -> Black" for bidder in list_of_bidders])
         return "Graph[{" + edges + \
                "}, \n\tVertexCoordinates -> {" + vertex_coordinates + \
@@ -321,7 +320,7 @@ VertexLabels->{1->"1", x->"x", y->"y"}]
         :row: a pandas tuple
         :return: a single-minded market.
         """
-        map_of_goods = {i: Good(i) for i in range(0, row[2])}
+        map_of_goods = {i: i for i in range(0, row[2])}
         set_of_goods = set(map_of_goods.values())
         map_of_bidders = {i: SingleMinded(i, set_of_goods, random_init=False) for i in range(0, row[1])}
 

@@ -1,17 +1,17 @@
-import unittest
-import bidders
 import random
-from market import Market
-from market_constituents import Good
-from market_inspector import MarketInspector
+import unittest
 from typing import Dict
+
+import bidders
+from market import Market
+from market_inspector import MarketInspector
 
 
 class MyTestCase(unittest.TestCase):
 
     def test_additive_bidders(self):
         """ Testing additive bidders. """
-        set_of_goods = {Good(i) for i in range(0, 5)}
+        set_of_goods = {i for i in range(0, 5)}
         additive_bidder_0 = bidders.Additive(0, set_of_goods, random_init=False)
         additive_bidder_0.set_values({good: 1 for good in set_of_goods})
         additive_market = Market(set_of_goods, {additive_bidder_0})
@@ -21,7 +21,7 @@ class MyTestCase(unittest.TestCase):
 
     def test_awb_bidders(self):
         """ Testing additive with budget bidders"""
-        set_of_goods = {Good(i) for i in range(0, 2)}
+        set_of_goods = {i for i in range(0, 2)}
         awb_bidder_0 = bidders.AdditiveWithBudget(0, set_of_goods, random_init=False)
         awb_bidder_0.set_values({good: 1 for good in set_of_goods})
         awb_bidder_0.set_budget(1)
@@ -51,7 +51,7 @@ class MyTestCase(unittest.TestCase):
         Test single-minded bidders creation.
         """
         # Create goods.
-        map_of_goods = {i: Good(i) for i in range(0, 5)}
+        map_of_goods = {i: i for i in range(0, 5)}
         set_of_goods = set(map_of_goods.values())
 
         # Create single-minded bidders.
@@ -113,7 +113,7 @@ class MyTestCase(unittest.TestCase):
         num_goods = 4
         num_bidders = 4
         for _ in range(0, 10):
-            set_of_goods = {Good(i) for i in range(0, num_goods)}
+            set_of_goods = {i for i in range(0, num_goods)}
             set_of_bidders = {bidders.SingleMinded(i, set_of_goods, random_init=False) for i in range(0, num_bidders)}
             for bidder in set_of_bidders:
                 bidder.set_preferred_bundle(set(random.sample(set_of_goods, k=random.randint(1, len(set_of_goods)))))
@@ -124,7 +124,7 @@ class MyTestCase(unittest.TestCase):
 
     # Taken from http://www.slahaie.net/pubs/LahaieLu19.pdf, page 6 - 7
     def test_non_existence_sm_example(self):
-        map_of_goods = {i: Good(i) for i in range(0, 3)}
+        map_of_goods = {i: i for i in range(0, 3)}
         set_of_goods = set(map_of_goods.values())
         map_of_bidders: Dict[int, bidders.SingleMinded]
         map_of_bidders = {i: bidders.SingleMinded(i, set_of_goods, random_init=False) for i in range(0, 4)}
@@ -172,8 +172,8 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(pricing_result['status'], 'Infeasible')
 
     def test_plots(self):
-        map_of_goods: Dict[int, Good]
-        map_of_goods = {i: Good(i) for i in range(0, 2)}
+        map_of_goods: Dict[int, int]
+        map_of_goods = {i: i for i in range(0, 2)}
         set_of_goods = set(map_of_goods.values())
 
         map_of_bidders: Dict[int, bidders.SingleMinded]
@@ -196,8 +196,8 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(True, True)
 
     def test_plots_1(self):
-        map_of_goods: Dict[int, Good]
-        map_of_goods = {i: Good(i) for i in range(0, 3)}
+        map_of_goods: Dict[int, int]
+        map_of_goods = {i: i for i in range(0, 3)}
         set_of_goods = set(map_of_goods.values())
 
         map_of_bidders: Dict[int, bidders.SingleMinded]

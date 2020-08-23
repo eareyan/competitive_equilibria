@@ -5,8 +5,7 @@ from typing import Set
 from pkbar import pkbar
 
 import bidders
-from market import Market
-from market_constituents import Good, Bidder
+from market import Market, Bidder
 from market_inspector import MarketInspector
 
 
@@ -17,10 +16,10 @@ class MyTestCase(unittest.TestCase):
         A simple market for debugging purposes.
         :return: a market.
         """
-        set_of_goods = {Good(i) for i in range(0, 5)}
+        set_of_goods = {i for i in range(0, 5)}
 
         class ConstantValueBidder(Bidder):
-            def value_query(self, bundle: Set[Good]) -> float:
+            def value_query(self, bundle: Set[int]) -> float:
                 # return len(bundle) * (1.0 / (self.get_id() + 1.0))
                 return len(bundle) * (self.get_id() + 1.0)
 
@@ -31,28 +30,20 @@ class MyTestCase(unittest.TestCase):
 
     def test_market_creation(self):
         """ Test the creation of markets. """
-        # Check that the set of goods contains only one good.
-        good0 = Good(0)
-        good1 = Good(0)
-        set_of_goods = {good0, good1}
-        # print(set_of_goods)
-        self.assertEqual(len(set_of_goods), 1)
 
         # Check that the set of bidders contains only one bidder.
         class DummyBidder(Bidder):
-            def value_query(self, bundle: Set[Good]) -> float:
+            def value_query(self, bundle: Set[int]) -> float:
                 return -1.0
 
-        bidder0 = DummyBidder(0, Bidder.get_set_of_all_bundles(len(set_of_goods)))
-        bidder1 = DummyBidder(0, Bidder.get_set_of_all_bundles(len(set_of_goods)))
+        bidder0 = DummyBidder(0, Bidder.get_set_of_all_bundles(2))
+        bidder1 = DummyBidder(0, Bidder.get_set_of_all_bundles(2))
         set_of_bidders = {bidder0, bidder1}
         # print(set_of_bidders)
         self.assertEqual(len(set_of_bidders), 1)
 
         # Check that the set of goods contains two goods.
-        good0 = Good(0)
-        good1 = Good(1)
-        set_of_goods = {good0, good1}
+        set_of_goods = {0, 1}
         # print(set_of_goods)
         self.assertEqual(len(set_of_goods), 2)
 
@@ -76,7 +67,7 @@ class MyTestCase(unittest.TestCase):
 
     def test_welfare_max_ilp_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the ilp. """
-        set_of_goods = {Good(i) for i in range(0, 10)}
+        set_of_goods = {i for i in range(0, 10)}
         set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 10)}
         market = Market(set_of_goods, set_of_bidders)
         # print(bidders.AdditiveWithBudget.get_pretty_representation(market))
@@ -91,7 +82,7 @@ class MyTestCase(unittest.TestCase):
 
     def test_brute_force_solve_random_awb_bidder(self):
         """ Generates a random instance of an AWB market and runs the brute force solver. """
-        set_of_goods = {Good(i) for i in range(0, 5)}
+        set_of_goods = {i for i in range(0, 5)}
         set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 5)}
         awb_market = Market(set_of_goods, set_of_bidders)
 
@@ -113,7 +104,7 @@ class MyTestCase(unittest.TestCase):
             progress_bar.update(k)
             k = k + 1
             # Create a random market with AWB valuations.
-            set_of_goods = {Good(i) for i in range(0, number_of_goods)}
+            set_of_goods = {i for i in range(0, number_of_goods)}
             set_of_awb_bidders = {bidder_type(i, set_of_goods) for i in range(0, number_of_bidders)}
             market = Market(set_of_goods, set_of_awb_bidders)
 
@@ -146,18 +137,15 @@ class MyTestCase(unittest.TestCase):
         error: check price computation
         Counterexample found!
         """
-        good_0 = Good(0)
-        good_1 = Good(1)
-        good_2 = Good(2)
-        set_of_goods = {good_0, good_1, good_2}
+        set_of_goods = {0, 1, 2}
 
         awb_bidder_0 = bidders.AdditiveWithBudget(0, set_of_goods, random_init=False)
         awb_bidder_0.set_budget(7)
-        awb_bidder_0.set_values({good_0: 1, good_1: 4, good_2: 5})
+        awb_bidder_0.set_values({0: 1, 1: 4, 2: 5})
 
         awb_bidder_1 = bidders.AdditiveWithBudget(1, set_of_goods, random_init=False)
         awb_bidder_1.set_budget(5)
-        awb_bidder_1.set_values({good_0: 3, good_1: 10, good_2: 1})
+        awb_bidder_1.set_values({0: 3, 1: 10, 2: 1})
 
         example_awb_market = Market(set_of_goods, {awb_bidder_0, awb_bidder_1})
         # print(bidders.AdditiveWithBudget.get_pretty_representation(example_awb_market))
@@ -184,7 +172,7 @@ class MyTestCase(unittest.TestCase):
         for t in range(0, n):
             progress_bar.update(t)
             # Draw a random additive market
-            set_of_goods = {Good(i) for i in range(0, 5)}
+            set_of_goods = {i for i in range(0, 5)}
             set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
             simple_market = Market(set_of_goods, set_of_bidders)
             # print(bidders.Additive.get_pretty_representation(simple_market))
@@ -211,7 +199,7 @@ class MyTestCase(unittest.TestCase):
         print("This is a probabilistic search, no ETA available...")
         while status == 'Optimal':
             # Draw a random market.
-            set_of_goods = {Good(i) for i in range(0, 3)}
+            set_of_goods = {i for i in range(0, 3)}
             set_of_bidders = {bidders.AdditiveWithBudget(i, set_of_goods) for i in range(0, 3)}
             awb_market = Market(set_of_goods, set_of_bidders)
             # print(bidders.AdditiveWithBudget.get_pretty_representation(awb_market))
@@ -234,22 +222,19 @@ class MyTestCase(unittest.TestCase):
 
     def test_single_minded_non_linear_pricing_lp(self):
 
-        good_0 = Good(0)
-        good_1 = Good(1)
-        good_2 = Good(2)
-        set_of_goods = {good_0, good_1, good_2}
+        set_of_goods = {0, 1, 2}
 
         bidder_0 = bidders.SingleMinded(0, set_of_goods, random_init=False)
-        bidder_0.set_preferred_bundle({good_0, good_2})
+        bidder_0.set_preferred_bundle({0, 2})
         bidder_0.set_value(5)
 
         bidder_1 = bidders.SingleMinded(1, set_of_goods, random_init=False)
-        bidder_1.set_preferred_bundle({good_0, good_1})
+        bidder_1.set_preferred_bundle({0, 1})
         # bidder_1.set_preferred_bundle({good_1})
         bidder_1.set_value(8)
 
         bidder_2 = bidders.SingleMinded(2, set_of_goods, random_init=False)
-        bidder_2.set_preferred_bundle({good_1, good_2})
+        bidder_2.set_preferred_bundle({1, 2})
         # bidder_2.set_preferred_bundle({good_0, good_1, good_2})
         bidder_2.set_value(10)
 
@@ -269,7 +254,7 @@ class MyTestCase(unittest.TestCase):
         print(MarketInspector.pretty_print_pricing(pricing_result))
 
     def test_additive_non_linear_pricing_lp(self):
-        set_of_goods = {Good(i) for i in range(0, 3)}
+        set_of_goods = {i for i in range(0, 3)}
         set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
         additive_market = Market(set_of_goods, set_of_bidders)
         print(bidders.Additive.get_pretty_representation(additive_market))
@@ -290,7 +275,7 @@ class MyTestCase(unittest.TestCase):
     def test_enumerate_all_allocations(self):
 
         # Generate a random additive market.
-        set_of_goods = {Good(i) for i in range(0, 3)}
+        set_of_goods = {i for i in range(0, 3)}
         set_of_bidders = {bidders.Additive(i, set_of_goods) for i in range(0, 3)}
         additive_market = Market(set_of_goods, set_of_bidders)
         # print(bidders.Additive.get_pretty_representation(additive_market))
@@ -301,6 +286,30 @@ class MyTestCase(unittest.TestCase):
         # for x in all_allocations:
         #    print(f"\t {x}")
         self.assertEqual(len(all_allocations), 64)
+
+    def test_welfare_upper_bound(self):
+        map_of_goods = {i: i for i in range(0, 5)}
+        set_of_goods = set(map_of_goods.values())
+
+        # Create single-minded bidders.
+        sm_bidder_0 = bidders.SingleMinded(0, set_of_goods, random_init=False)
+        sm_bidder_0.set_preferred_bundle({map_of_goods[0], map_of_goods[2]})
+        sm_bidder_0.set_value(10.0)
+        sm_bidder_1 = bidders.SingleMinded(1, set_of_goods, random_init=False)
+        sm_bidder_1.set_preferred_bundle({map_of_goods[1], map_of_goods[2]})
+        sm_bidder_1.set_value(1.0)
+        sm_bidder_2 = bidders.SingleMinded(2, set_of_goods, random_init=False)
+        sm_bidder_2.set_preferred_bundle(set_of_goods)
+        sm_bidder_2.set_value(5.0)
+
+        # Create market.
+        sm_market = Market(set_of_goods, {sm_bidder_0, sm_bidder_1, sm_bidder_2})
+        print(bidders.SingleMinded.get_pretty_representation(sm_market))
+
+        self.assertEqual(sm_market.welfare_upper_bound(sm_bidder_0, set()), 6.0)
+        self.assertEqual(sm_market.welfare_upper_bound(sm_bidder_1, {0}), 0.0)
+        self.assertEqual(sm_market.welfare_upper_bound(sm_bidder_2, {1}), 10.0)
+        self.assertEqual(True, True)
 
 
 if __name__ == '__main__':

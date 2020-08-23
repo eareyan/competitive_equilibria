@@ -1,6 +1,5 @@
 from prettytable import PrettyTable
 from market import Market
-from market_constituents import Good
 from bidders import SingleMinded
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
@@ -44,7 +43,7 @@ def does_market_clear(*args):
     # print(preferred_bundles, values)
 
     # Compute the list and set of goods.
-    list_of_goods = [Good(i) for i in range(0, num_goods)]
+    list_of_goods = [i for i in range(0, num_goods)]
     set_of_goods = set(list_of_goods)
 
     # Compute the set of bidders.

@@ -1,27 +1,97 @@
 import itertools as it
 import time
+from abc import abstractmethod
 from typing import Set, Dict, Tuple, List, Optional, FrozenSet, Union
 
 import pulp
 
-from market_constituents import Good, Bidder
+
+class Bidder:
+    """ Representation of a bidder a market.
+    This is an abstract class. Concrete bidder implementations specify how bidders
+     value bundle of queries via value_query method. """
+
+    map_list_all_bundles = {}
+
+    def __init__(self, bidder_id: int, base_bundles: Optional[Set[FrozenSet[int]]]):
+        """
+        A bidder must be given a unique integer id. Note that different bidders in a market must have different ids.
+        The bidder receives the goods over which it will compute its valuation.
+        :param bidder_id: the bidder id, an integer.
+        :param base_bundles: a set of frozenset of goods. Each frozen is a bundle for which the bidder has positive value.
+        """
+        self.__bidder_id: int = bidder_id
+        self._base_bundles: Set[FrozenSet[int]] = base_bundles
+
+    def __hash__(self):
+        """
+        The hash of a good is simply its id.
+        """
+        return self.__bidder_id
+
+    def __repr__(self):
+        """
+        Produces a string representation of the bidder.
+        :return: A string representation of the bidder.
+        """
+        return f"Bidder #{self.__bidder_id}"
+
+    def __eq__(self, other):
+        """
+        A bidder is equal to another bidder if they share the same id.
+        :param other: another bidder
+        :return: True if this bidder is equal to the given other bidder.
+        """
+        return isinstance(other, Bidder) and other.__bidder_id == self.__bidder_id
+
+    def get_id(self) -> int:
+        """
+        :return: the bidder's id
+        """
+        return self.__bidder_id
+
+    def get_base_bundles(self) -> Set[FrozenSet[int]]:
+        """
+        :return: the bidder's base bundles, i.e., those for which the bidders has positive value.
+        """
+        return self._base_bundles
+
+    @abstractmethod
+    def value_query(self, bundle: Union[Set[int], FrozenSet[int]]) -> float:
+        """
+        Given a bundle of goods, i.e., a set of goods, returns a numerical value for the bundle.
+        :param bundle: a set of Goods.
+        :return: the value of the bundle of goods, a float.
+        """
+        pass
+
+    @staticmethod
+    def get_set_of_all_bundles(n: int) -> Set[FrozenSet[int]]:
+        """
+        :param n:
+        :return:
+        """
+        if n not in Bidder.map_list_all_bundles:
+            s = list({i for i in range(0, n)})
+            Bidder.map_list_all_bundles[n] = {frozenset(bundle) for bundle in it.chain.from_iterable(it.combinations(s, r) for r in range(len(s) + 1))}
+        return Bidder.map_list_all_bundles[n]
 
 
 class Market:
     """ Representation of a Market, which contains a set of goods and a set of bidders that have value over sets of goods."""
 
-    def __init__(self, goods: Set[Good], bidders: Set[Bidder]):
-        # Fundamental pieces of any market are: a set of goods and a set of bidders.
-        self._goods: Set[Good] = goods
+    def __init__(self, goods: Set[int], bidders: Set[Bidder]):
+        # Fundamental pieces of any market are: a set of goods and a set of bidders. Goods are represented by integers.
+        self._goods: Set[int] = goods
         self._bidders: Set[Bidder] = bidders
 
         # Maps for LP variables, generated (once) in function generate_vars_maps for solving the welfare maximizing allocation.
         # Maps a bidder, bundle pair, to a pulp variable.
-        self._bidder_bundle_vars: Optional[Dict[Tuple[Bidder, FrozenSet[Good]], pulp.LpVariable]] = None
+        self._bidder_bundle_vars: Optional[Dict[Tuple[Bidder, FrozenSet[int]], pulp.LpVariable]] = None
         # Maps a bidder to a pulp variable.
         self.__bidders_vars: Optional[Dict[Bidder, pulp.LpVariable]] = None
         # Maps a good to a pulp variable.
-        self.__goods_vars: Optional[Dict[Good, pulp.LpVariable]] = None
+        self.__goods_vars: Optional[Dict[int, pulp.LpVariable]] = None
 
     def __repr__(self):
         """
@@ -99,7 +169,7 @@ class Market:
         # Create goods constraints: a good cannot be over allocated.
         t0 = time.time()
         for good in self.__goods_vars.keys():
-            model += pulp.lpSum(self.__goods_vars[good]) <= 1.0, f"Good #{good.get_id()} constraint"
+            model += pulp.lpSum(self.__goods_vars[good]) <= 1.0, f"Good #{good} constraint"
         result['goods_constraints_time'] = time.time() - t0
 
         # Create bidders constraints: a bidder cannot be allocated two bundles.
@@ -134,6 +204,27 @@ class Market:
         result['optimal_welfare'] = pulp.value(model.objective) if pulp.value(model.objective) is not None else 0.0
 
         return result
+
+    def welfare_upper_bound(self, allocated_bidder: Bidder, allocated_bundle: Set[int]):
+        """
+        Computes an upper bound on the maximum welfare when bundle is allocated to noisy_bidder
+        which means that all the goods in the bundle are not available for the rest of the bidders
+        and that the bidder cannot be allocated anything other than the goods in the bundle.
+        First idea: greedily allocate bundles by value ignoring feasibility constraints.
+        This amounts to allocating, to each bidder, the bundle with highest value provided the
+        bundle does not intersect with the given bundle.
+
+        If the bundle is small, then it intersect few other bundles resulting in a higher welfare upper bound.
+        If the bundle is large (say all), it intersects many other (say all) bundles resulting in a lower welfare upper bound.
+        """
+        value = 0
+        for bidder in self._bidders:
+            if bidder.get_id() != allocated_bidder.get_id():
+                # Find the welfare of this bidder
+                candidate_values = [bidder.value_query(bundle)
+                                    for bundle in bidder.get_base_bundles() if len(bundle.intersection(allocated_bundle)) == 0]
+                value += max(candidate_values) if len(candidate_values) > 0 else 0
+        return value
 
     def brute_force_welfare_max_solver(self):
         """
@@ -187,7 +278,7 @@ class Market:
         # Return the optimal welfare together with the allocation that attains it.
         return max_welfare, argmax_allocation
 
-    def get_bundle_prices(self, quadratic=False) -> Tuple[Dict[FrozenSet[Good], pulp.LpAffineExpression], List[Dict[str, pulp.LpVariable]]]:
+    def get_bundle_prices(self, quadratic=False) -> Tuple[Dict[FrozenSet[int], pulp.LpAffineExpression], List[Dict[str, pulp.LpVariable]]]:
         """
         Returns a map from bundle to pulp affine expressions that define the price of the bundle.
         TODO more flexible pricing structures, beyond just linear and quadratic.
@@ -201,7 +292,7 @@ class Market:
             quadra_prices = pulp.LpVariable.dicts('p', list(it.combinations(self._goods, 2)), lowBound=0.0)
 
         # Generate a map from bundle -> price of bundle. For now, the price of a bundle is linear or linear plus quadratic.
-        map_bundle_to_price: Dict[FrozenSet[Good], pulp.LpAffineExpression] = {}
+        map_bundle_to_price: Dict[FrozenSet[int], pulp.LpAffineExpression] = {}
         for bundle in Bidder.get_set_of_all_bundles(len(self._goods)):
             bundle = frozenset(bundle)
             lp_linear_prices = pulp.lpSum([linear_prices[good] for good in bundle])
@@ -213,7 +304,7 @@ class Market:
 
         return map_bundle_to_price, [linear_prices, quadra_prices]
 
-    def pricing(self, allocation: Dict[Bidder, Set[Good]], quadratic=False):
+    def pricing(self, allocation: Dict[Bidder, Set[int]], quadratic=False):
         """
         Solve the competitive equilibria pricing LP.
         :param allocation: a dictionary mapping a bidder to a set of goods. If the bidder is not in the map, it was not in the allocation.
@@ -228,7 +319,7 @@ class Market:
         model = pulp.LpProblem('Pricing_Problem', pulp.LpMaximize)
 
         # Get the prices for bundles.
-        map_bundle_to_price: Dict[Union[Tuple[Good], Set[Good], FrozenSet[Good]], pulp.LpAffineExpression]
+        map_bundle_to_price: Dict[Union[Tuple[int], Set[int], FrozenSet[int]], pulp.LpAffineExpression]
         list_of_prices_vars: List[Dict[str, pulp.LpVariable]]
         map_bundle_to_price, list_of_prices_vars = self.get_bundle_prices(quadratic)
 

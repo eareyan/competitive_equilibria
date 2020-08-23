@@ -4,29 +4,29 @@ from typing import Dict
 
 import numpy as np
 
-from market_constituents import NoisyBidder, Good, Bidder
+from market import Bidder
+from market_noisy import NoisyMarket, NoisyBidder, get_noise_generator
 from market_inspector import MarketInspector
-from market_noisy import NoisyMarket, get_noise_generator
 
 
 class MyTestCase(unittest.TestCase):
 
     @staticmethod
     def get_simple_noisy_market():
-        set_of_goods = {Good(i) for i in range(0, 18)}
+        set_of_goods = {i for i in range(0, 18)}
 
         noise_generator, c = get_noise_generator()
         noisy_bidder_1 = NoisyBidder(0,
                                      {
-                                         frozenset({Good(0)}): 1.0,
-                                         frozenset({Good(20)}): 2.0,
-                                         frozenset({Good(0), Good(1)}): 3.0
+                                         frozenset({0}): 1.0,
+                                         frozenset({20}): 2.0,
+                                         frozenset({0, 1}): 3.0
                                      },
                                      noise_generator)
         noisy_bidder_2 = NoisyBidder(1,
                                      {
-                                         frozenset({Good(2)}): 20.0,
-                                         frozenset({Good(0), Good(1), Good(2)}): 30.0
+                                         frozenset({2}): 20.0,
+                                         frozenset({0, 1, 2}): 30.0
                                      },
                                      noise_generator)
         noisy_bidder_3 = NoisyBidder(2,
@@ -39,7 +39,7 @@ class MyTestCase(unittest.TestCase):
 
     @staticmethod
     def get_bigger_noisy_market():
-        set_of_goods = {Good(i) for i in range(0, 18)}
+        set_of_goods = {i for i in range(0, 18)}
         # A small region for testing. Bigger regions follow.
         size_of_region = [5, 4, 3, 5, 4]
         # size_of_region = [6, 7, 8, 11, 5]
@@ -113,17 +113,17 @@ class MyTestCase(unittest.TestCase):
     def test_noisy_market_creation(self):
         # Create a noisy market.
         map_of_noisy_bidders: Dict[int, NoisyBidder]
-        map_of_noisy_bidders = {i: NoisyBidder(i, {frozenset({Good(2), Good(0)}): 1}, lambda n: n) for i in range(0, 1)}
-        map_of_noisy_bidders[0].sample_value_query(frozenset({Good(2), Good(0)}), 100, 0.1)
+        map_of_noisy_bidders = {i: NoisyBidder(i, {frozenset({2, 0}): 1}, lambda n: n) for i in range(0, 1)}
+        map_of_noisy_bidders[0].sample_value_query(frozenset({2, 0}), 100, 0.1)
         # print(map_of_noisy_bidders[0].value_query({Good(0), Good(2)}))
-        self.assertEqual(map_of_noisy_bidders[0].value_query({Good(0), Good(2)}), 101)
+        self.assertEqual(map_of_noisy_bidders[0].value_query({0, 2}), 101)
 
     def test_elicitation_algo(self):
         # Elicitation algorithm parameters.
         noise_generator, c = get_noise_generator()
 
         # Create the noisy market.
-        set_of_goods = {Good(i) for i in range(0, 3)}
+        set_of_goods = {i for i in range(0, 3)}
         map_of_noisy_bidders: Dict[int, NoisyBidder]
         # Create synthetic bundle base values. The value of a bundle is equal to the number of goods in the bundle.
         s = list(set_of_goods)
@@ -161,7 +161,7 @@ class MyTestCase(unittest.TestCase):
         # print(deep_dive_ptable)
 
     def test_pruning_algo(self):
-        # TODO more in-depth testing of EAP. Then, code LSVM and GSVM. Then, how to run experiments on grid?
+        # TODO more in-depth testing of EAP. Then, test LSVM and then, code GSVM. Then, how to run experiments on grid?
         pass
 
 

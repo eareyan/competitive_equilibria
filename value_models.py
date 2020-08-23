@@ -3,13 +3,12 @@ import os
 
 import pandas as pd
 
-from market_constituents import NoisyBidder, Good
-from market_noisy import NoisyMarket, get_noise_generator
+from market_noisy import NoisyMarket, NoisyBidder, get_noise_generator
 
 
 def solve_lsvm_world(json_world_loc, results_folder):
     """
-    Reads in a LSVM world and saves various .csv files with infor about elicitation with pruning.
+    Reads in a LSVM world and saves various .csv files with information about elicitation with pruning.
     :param json_world_loc: the location of a json file defining a LSVM market.
     :param results_folder: the folder where to store results, i.e., various .csv files.
     """
@@ -45,12 +44,12 @@ def solve_lsvm_world(json_world_loc, results_folder):
         # bidder_summary = [[bidder['id'], bidder['preferred_licences']]]
         # Just making sure that the value function is of the right length, i.e., all subsets of the preferred licenses.
         assert len(bidder['values']) == 2 ** len(bidder['preferred_licences'])
-        value_function = {frozenset({Good(j) for j in map_bundle_values['bundle']}): map_bundle_values['value']
+        value_function = {frozenset({j for j in map_bundle_values['bundle']}): map_bundle_values['value']
                           for map_bundle_values in bidder['values']}
         map_of_bidders[bidder['id']] = NoisyBidder(bidder['id'], value_function, my_noise_generator)
 
     # Construct the market object. The LSVM model has 18 goods.
-    noisy_market = NoisyMarket({Good(j) for j in range(0, 18)}, set(map_of_bidders.values()))
+    noisy_market = NoisyMarket({j for j in range(0, 18)}, set(map_of_bidders.values()))
 
     # Test elicitation algo
     # noisy_market.elicit(number_of_samples=100,
@@ -92,3 +91,7 @@ if __name__ == "__main__":
         the_results_folder = f"{the_base_folder_location}worlds_results/world{i}/"
         the_world_loc = f'{the_base_folder_location}worlds/world{i}.json'
         solve_lsvm_world(json_world_loc=the_world_loc, results_folder=the_results_folder)
+
+    # solve_lsvm_world('LSVM/develop/world/world0.json', 'LSVM/develop/world_results/world0/')
+    # solve_lsvm_world('LSVM/develop/world/world0_big.json', 'LSVM/develop/world_results/world0_big/')
+    # solve_lsvm_world('LSVM/develop/world/world1.json', 'LSVM/develop/world_results/world1/')
