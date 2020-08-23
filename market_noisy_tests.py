@@ -4,9 +4,9 @@ from typing import Dict
 
 import numpy as np
 
+import market_inspector
 from market import Bidder
 from market_noisy import NoisyMarket, NoisyBidder, get_noise_generator
-from market_inspector import MarketInspector
 
 
 class MyTestCase(unittest.TestCase):
@@ -69,8 +69,8 @@ class MyTestCase(unittest.TestCase):
                             c=c)
 
         welfare_max_result_ilp = noisy_market.welfare_max_program()
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
 
         self.assertEqual(True, True)
 
@@ -80,8 +80,8 @@ class MyTestCase(unittest.TestCase):
         noisy_market.elicit(number_of_samples=250,
                             delta=0.1,
                             c=c)
-        print(MarketInspector.noisy_bidder_values(noisy_bidder_list[0]))
-        print(MarketInspector.noisy_bidder_values(noisy_bidder_list[1]))
+        print(market_inspector.noisy_bidder_values(noisy_bidder_list[0]))
+        print(market_inspector.noisy_bidder_values(noisy_bidder_list[1]))
         self.assertEqual(True, True)
 
     def test_elicitation_with_pruning(self):
@@ -95,7 +95,7 @@ class MyTestCase(unittest.TestCase):
                                                       # target_epsilon=0.1,
                                                       c=c)
 
-        param_ptable, result_ptable, deep_dive_ptable = MarketInspector.inspect_elicitation_with_pruning(result_eap, noisy_market)
+        param_ptable, result_ptable, deep_dive_ptable = market_inspector.inspect_elicitation_with_pruning(result_eap, noisy_market)
         print(param_ptable)
         print(result_ptable)
 
@@ -105,8 +105,8 @@ class MyTestCase(unittest.TestCase):
         #     print(MarketInspector.noisy_bidder_values(noisy_bidder))
 
         welfare_max_result_ilp = noisy_market.welfare_max_program()
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
 
         self.assertEqual(True, True)
 
@@ -153,8 +153,8 @@ class MyTestCase(unittest.TestCase):
                                                       target_epsilon=0.0001,
                                                       c=c)
         # MarketInspector.noisy_bidder_values(map_of_noisy_bidders[0])
-        print(MarketInspector.noisy_bidder_values(map_of_noisy_bidders[0]))
-        param_ptable, result_ptable, deep_dive_ptable = MarketInspector.inspect_elicitation_with_pruning(result_eap, noisy_market)
+        print(market_inspector.noisy_bidder_values(map_of_noisy_bidders[0]))
+        param_ptable, result_ptable, deep_dive_ptable = market_inspector.inspect_elicitation_with_pruning(result_eap, noisy_market)
         print(param_ptable)
         print(result_ptable)
         # print(deep_dive_ptable)

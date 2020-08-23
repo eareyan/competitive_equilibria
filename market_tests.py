@@ -2,11 +2,11 @@ import itertools as it
 import unittest
 from typing import Set
 
+import market_inspector
 from pkbar import pkbar
 
 import bidders
 from market import Market, Bidder
-from market_inspector import MarketInspector
 
 
 class MyTestCase(unittest.TestCase):
@@ -55,8 +55,8 @@ class MyTestCase(unittest.TestCase):
         # print(f"Market test: \n{my_market}")
 
         welfare_max_result_ilp = my_market.welfare_max_program()
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
 
         # Check that the solver coincides with the brute force algorithm.
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], my_market.brute_force_welfare_max_solver()[0])
@@ -247,7 +247,7 @@ class MyTestCase(unittest.TestCase):
 
         # Try to compute non-linear CE prices.
         pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
-        print(MarketInspector.pretty_print_pricing(pricing_result))
+        print(market_inspector.pretty_print_pricing(pricing_result))
 
     def test_additive_non_linear_pricing_lp(self):
         set_of_goods = {i for i in range(0, 3)}
@@ -257,13 +257,13 @@ class MyTestCase(unittest.TestCase):
 
         # Solve for the welfare-maximizing allocation.
         welfare_max_result_ilp = additive_market.welfare_max_program()
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
 
         # Try to compute non-linear CE prices.
         pricing_result = additive_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
-        print(MarketInspector.pretty_print_pricing(pricing_result))
-        print(MarketInspector.pricing_stats_table(pricing_result))
+        print(market_inspector.pretty_print_pricing(pricing_result))
+        print(market_inspector.pricing_stats_table(pricing_result))
 
         # The non-linear pricing should never fail for additive markets.
         self.assertEqual(pricing_result['status'], 'Optimal')

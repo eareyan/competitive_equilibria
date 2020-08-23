@@ -3,8 +3,8 @@ import unittest
 from typing import Set
 
 import bidders
+import market_inspector
 from market import Market
-from market_inspector import MarketInspector
 
 
 class MyTestCase(unittest.TestCase):
@@ -33,15 +33,15 @@ class MyTestCase(unittest.TestCase):
 
         # Solve for the welfare-maximizing allocation.
         welfare_max_result_ilp = awb_market.welfare_max_program()
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
 
         # Testing the value of the welfare-max allocation
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 3.0)
 
         # Solve for the welfare-maximizing allocation (via brute force).
         welfare_brute_force, allocation_brute_force = awb_market.brute_force_welfare_max_solver()
-        print(MarketInspector.pretty_print_allocation(allocation_brute_force))
+        print(market_inspector.pretty_print_allocation(allocation_brute_force))
 
         # The optimal welfare of this instance we know is 11.
         self.assertEqual(welfare_brute_force, 3.0)
@@ -90,13 +90,13 @@ class MyTestCase(unittest.TestCase):
         # Test welfare-maximizing allocation
         welfare_max_result_ilp = sm_market.welfare_max_program()
         # print(welfare_max_result_ilp)
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 10.0)
 
         # Test welfare-maximizing allocation, via brute force
         welfare_brute_force, allocation_brute_force = sm_market.brute_force_welfare_max_solver()
-        print(MarketInspector.pretty_print_allocation(allocation_brute_force))
+        print(market_inspector.pretty_print_allocation(allocation_brute_force))
         self.assertEqual(welfare_brute_force, 10.0)
 
     def test_sm_equivalence_class(self):
@@ -128,13 +128,13 @@ class MyTestCase(unittest.TestCase):
 
         # Test welfare-maximizing allocation
         welfare_max_result_ilp = sm_market.welfare_max_program()
-        print(MarketInspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
-        print(MarketInspector.welfare_max_stats_table(welfare_max_result_ilp))
+        print(market_inspector.pretty_print_allocation(welfare_max_result_ilp['optimal_allocation']))
+        print(market_inspector.welfare_max_stats_table(welfare_max_result_ilp))
         self.assertEqual(welfare_max_result_ilp['optimal_welfare'], 5.0)
 
         # Try to compute linear CE prices.
         pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'])
-        print(MarketInspector.pretty_print_pricing(pricing_result))
+        print(market_inspector.pretty_print_pricing(pricing_result))
         self.assertEqual(pricing_result['status'], 'Optimal')
 
         # With the following values, a CE does not exists.
@@ -147,12 +147,12 @@ class MyTestCase(unittest.TestCase):
 
         # Try to compute linear CE prices.
         pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'])
-        print(MarketInspector.pretty_print_pricing(pricing_result))
+        print(market_inspector.pretty_print_pricing(pricing_result))
         self.assertEqual(pricing_result['status'], 'Infeasible')
 
         # Try to compute quadratic CE prices.
         pricing_result = sm_market.pricing(welfare_max_result_ilp['optimal_allocation'], quadratic=True)
-        print(MarketInspector.pretty_print_pricing(pricing_result))
+        print(market_inspector.pretty_print_pricing(pricing_result))
         self.assertEqual(pricing_result['status'], 'Infeasible')
 
     def test_plots(self):
