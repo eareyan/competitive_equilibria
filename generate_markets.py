@@ -32,6 +32,7 @@ def create_sm_market_from_graph(graph_goods, graph_bidders, graph_edges):
     set_of_goods = set(map_of_goods.values())
 
     # Create the bidders - just their ids, we will populate their preferred sets and values later.
+    # TODO update this method with the new way of creating SingleMinded objects.
     map_of_bidders = {i: SingleMinded(i, set_of_goods, random_init=False) for i in eval(graph_bidders)}
     set_of_bidders = set(map_of_bidders.values())
 
@@ -92,7 +93,7 @@ def generate_and_save_non_iso_markets(total, spark_session, input_graphs_loc, ou
 
 def generate_market_values(*args, support_values: List[int] = None):
     """
-
+    TODO update this method with the new way of creating SingleMinded objects.
     """
     # Build the market.
     num_bidders = int(args[NUM_BIDDERS_INDEX])

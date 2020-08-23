@@ -42,20 +42,14 @@ def does_market_clear(*args):
     values = [int(x) for x in args[col_offset + num_bidders:col_offset + 2 * num_bidders]]
     # print(preferred_bundles, values)
 
-    # Compute the list and set of goods.
-    list_of_goods = [i for i in range(0, num_goods)]
-    set_of_goods = set(list_of_goods)
-
     # Compute the set of bidders.
-    set_of_bidders = set()
-    for i in range(0, num_bidders):
-        sm_bidder = SingleMinded(i, set_of_goods, random_init=False)
-        sm_bidder.set_preferred_bundle({list_of_goods[j] for j in range(0, num_goods) if preferred_bundles[i][j] == 1})
-        sm_bidder.set_value(values[i])
-        set_of_bidders.add(sm_bidder)
+    set_of_bidders = {SingleMinded(bidder_id=i,
+                                   preferred_bundle=frozenset({j for j in range(0, num_goods) if preferred_bundles[i][j] == 1}),
+                                   value=values[i])
+                      for i in range(0, num_bidders)}
 
     # Construct the single-minded market.
-    sm_market = Market(set_of_goods, set_of_bidders)
+    sm_market = Market(goods={j for j in range(0, num_goods)}, bidders=set_of_bidders)
     linear_clear, non_linear_clear = check_ce(sm_market)
     return linear_clear, non_linear_clear
 

@@ -1,5 +1,5 @@
 import random
-from typing import Set, Dict
+from typing import Set, Dict, FrozenSet
 
 from prettytable import PrettyTable
 
@@ -11,12 +11,7 @@ class Additive(Bidder):
 
     def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
         super().__init__(bidder_id, Bidder.get_set_of_all_bundles(len(goods)))
-        if random_init:
-            self._values = {}
-            for good in goods:
-                self._values[good] = random.randint(1, 10)
-        else:
-            self._values = None
+        self._values = {good: random.randint(1, 10) for good in goods} if random_init else None
 
     def set_values(self, values: Dict[int, float]):
         """
@@ -54,7 +49,7 @@ class Additive(Bidder):
         additive_matrix_pretty_matrix.title = 'Additive Market'
         # Get a list of goods so that we can guarantee the order of the set.
         goods = list(additive_market.get_goods())
-        additive_matrix_pretty_matrix.field_names = ['B\G'] + [good for good in goods]
+        additive_matrix_pretty_matrix.field_names = ['B\G'] + [f"Good #{good}" for good in goods]
 
         for bidder in additive_market.get_bidders():
             additive_matrix_pretty_matrix.add_row([bidder] + [bidder.get_good_value(good) for good in goods])
@@ -69,12 +64,8 @@ class AdditiveWithBudget(Additive):
 
     def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
         super().__init__(bidder_id, goods, False)
-        if random_init:
-            self._budget = random.randint(1, 10)
-            self._values = {good: random.randint(1, 10) for good in goods}
-        else:
-            self._budget = None
-            self._values = None
+        self._budget = random.randint(1, 10) if random_init else None
+        self._values = {good: random.randint(1, 10) for good in goods} if random_init else None
 
     def set_budget(self, budget: float):
         """
@@ -123,34 +114,9 @@ class AdditiveWithBudget(Additive):
 class SingleMinded(Bidder):
     """ Represents a single-minded bidder. """
 
-    def __init__(self, bidder_id: int, goods: Set[int], random_init=True):
-        super().__init__(bidder_id, None)
-        if random_init:
-            self._preferred_bundle = set(random.sample(goods, random.randint(1, len(goods))))
-            self._value = random.randint(1, 10)
-            self._base_bundles = {frozenset(self._preferred_bundle)}
-        else:
-            self._preferred_bundle = None
-            self._value = None
-
-    def set_preferred_bundle(self, preferred_bundle: Set[int]):
-        """
-        Setter.
-        :param preferred_bundle: a bundle of goods, i.e., a set of goods.
-        """
-        if self._preferred_bundle is not None:
-            raise Exception("The preferred bundle can only be set once. ")
+    def __init__(self, bidder_id: int, preferred_bundle: FrozenSet[int], value: float):
+        super().__init__(bidder_id, {preferred_bundle})
         self._preferred_bundle = preferred_bundle
-        self._base_bundles = {frozenset(self._preferred_bundle)}
-
-    def set_value(self, value: float, safe_check=True):
-        """
-        Setter.
-        :param value: the bidder's value
-        :param safe_check: boolean, should we check the value was already set?
-        """
-        if safe_check and self._value is not None:
-            raise Exception("The value can only be set once. ")
         self._value = value
 
     def get_preferred_bundle(self):
@@ -218,7 +184,7 @@ VertexLabels->{1->"1", x->"x", y->"y"}]
             padding_len = 2 * (len(goods) + len(bidders)) - len(market_as_list)
         else:
             padding_len = len(goods) + len(bidders) + 1 - len(market_as_list)
-        return market_as_list + ['' for i in range(0, padding_len)]
+        return market_as_list + ['' for _ in range(0, padding_len)]
 
     @staticmethod
     def count_bidders_pref_bundle_sizes(sm_market):
@@ -287,7 +253,7 @@ VertexLabels->{1->"1", x->"x", y->"y"}]
         sm_pretty_matrix.title = 'Single-minded Market'
         # Get a list of goods so that we can guarantee the order of the set.
         goods = list(sm_market.get_goods())
-        sm_pretty_matrix.field_names = ['B\G'] + [good for good in goods] + ['Value']
+        sm_pretty_matrix.field_names = ['B\G'] + [f"Good #{good}" for good in goods] + ['Value']
         for bidder in sm_market.get_bidders():
             sm_pretty_matrix.add_row([bidder] + [1 if good in bidder.get_preferred_bundle() else 0 for good in goods] + [bidder.get_value_preferred_bundle()])
 
@@ -320,18 +286,13 @@ VertexLabels->{1->"1", x->"x", y->"y"}]
         :row: a pandas tuple
         :return: a single-minded market.
         """
-        map_of_goods = {i: i for i in range(0, row[2])}
-        set_of_goods = set(map_of_goods.values())
-        map_of_bidders = {i: SingleMinded(i, set_of_goods, random_init=False) for i in range(0, row[1])}
-
+        set_of_bidders: Set[SingleMinded] = set()
         for i in range(0, row[1]):
             list_of_preferred_goods = eval(row[i + 3])
-            map_of_bidders[i].set_preferred_bundle({map_of_goods[j] for j in range(0, row[2]) if list_of_preferred_goods[j] == 1})
-            map_of_bidders[i].set_value(int(row[i + row[1] + 3]))
+            set_of_bidders.add(SingleMinded(bidder_id=i,
+                                            preferred_bundle=frozenset({j for j in range(0, row[2]) if list_of_preferred_goods[j] == 1}),
+                                            value=int(row[i + row[1] + 3])))
 
-        return Market(set_of_goods, set(map_of_bidders.values()))
-
-
-types_of_bidders = [Additive, AdditiveWithBudget, SingleMinded]
+        return Market({i for i in range(0, row[2])}, set_of_bidders)
 
 # TODO make a double, single-minded bidder. It has 2 preferred bundles and 2 values. Maybe quadratic helps here?

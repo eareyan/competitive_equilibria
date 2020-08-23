@@ -11,6 +11,7 @@ class Bidder:
     This is an abstract class. Concrete bidder implementations specify how bidders
      value bundle of queries via value_query method. """
 
+    """ A map to cache the set of all bundles. """
     map_list_all_bundles = {}
 
     def __init__(self, bidder_id: int, base_bundles: Optional[Set[FrozenSet[int]]]):
@@ -68,8 +69,8 @@ class Bidder:
     @staticmethod
     def get_set_of_all_bundles(n: int) -> Set[FrozenSet[int]]:
         """
-        :param n:
-        :return:
+        :param n: an integer that represents for how many goods, 0, 1, ..., n - 1, we want the set of all bundles.
+        :return: a set of bundles, i.e., a set of frozen sets of integers.
         """
         if n not in Bidder.map_list_all_bundles:
             s = list({i for i in range(0, n)})

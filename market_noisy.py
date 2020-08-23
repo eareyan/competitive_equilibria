@@ -34,9 +34,6 @@ class NoisyBidder(Bidder):
         self._current_empirical_values: Dict[FrozenSet[int], Tuple[float, float, int]] = {frozenset(bundle): (None, None, 0)
                                                                                           for bundle, _ in self._map_base_bundles_to_values.items()}
 
-    def get_map_base_bundles_to_values(self):
-        return self._map_base_bundles_to_values
-
     def get_current_empirical_values(self, bundle: Union[Set[int], FrozenSet[int]]) -> Tuple[float, float, int]:
         """
         :param bundle: a bundle of goods.
@@ -54,9 +51,9 @@ class NoisyBidder(Bidder):
 
     def sample_value_query(self, bundle: FrozenSet[int], number_of_samples: int, epsilon: float):
         """
-        :param bundle:
-        :param number_of_samples:
-        :param epsilon:
+        :param bundle: a bundle of goods, i.e., a set of integers.
+        :param number_of_samples: how many samples of the given bundle to take.
+        :param epsilon: the confidence interval radius achieved by taking number_of_samples many samples.
         """
         assert bundle in self._map_base_bundles_to_values
         empirical_average = np.mean(self._map_base_bundles_to_values[bundle] + self._noise_generator(number_of_samples))
@@ -114,9 +111,7 @@ class NoisyMarket(Market):
             # Sample all active bidders, bundle pairs.
             hat_epsilon = self.elicit(number_of_samples, delta, c)
             if hat_epsilon <= target_epsilon or len(self._active_consumer_bundle_pair) == 0 or t == len(sampling_schedule) - 1:
-                result['total_num_iterations'] = t + 1
-                result['actual_eps'] = hat_epsilon
-                result['time'] = time.time() - t0
+                result['total_num_iterations'], result['actual_eps'], result['time'] = t + 1, hat_epsilon, time.time() - t0
                 return result
 
             # The remaining code is all about trying to prune bidders, bundle pairs.
@@ -143,6 +138,33 @@ class NoisyMarket(Market):
             # Record statistics.
             result[t] = {'_active_consumer_bundle_pair': self._active_consumer_bundle_pair,
                          'prune_set': prune_set}
+
+    def heuristic_upper_bound(self, noisy_bidder, bundle, welfare_program=None, ilp=True):
+        """
+        Computing heuristic upper bounds.
+        Idea: as a function of the size of the bundle, solve the ilp or the upper bound.
+        Intuition, if the bundle is LARGE, then the greedy upper bound should be very good.
+        If the bundle is small, then the greedy upper bound is not as good b/c it intersects too few other bundles.
+        """
+        if ilp:
+            # TODO: how about trying an approximation algorithm here?
+            # TODO: time the run of EAP by clock, give some budget: say 1 hour per run.
+            # TODO: if we know how long the ILP gets to run, then we know how many runs of it we can do in an hour.
+            # TODO: maybe we can do just a few runs of the ILP. Who to chose? Obvious candidate, pairs (i,S) with lowest lower bound.
+            # TODO: out of those that remain after quick pruning.
+            # TODO: there would be MANY pairs (i,S) to chose from, chose carefully.
+            # TODO: Is there a measure of "expected gain" = how much benefit we derived if we could prune this (i,S)?
+            # TODO: sounds like this is related to how much that (i, S) "resolves" conflicts.
+            # TODO: parallelize the algorithm: each run of the pruning test is independent of any other.
+            # Instead of re-building the ILP, we will change it and resolve it here.
+            if 'initial_assignment' in welfare_program['model'].constraints:
+                del welfare_program['model'].constraints['initial_assignment']
+            welfare_program['model'] += self._bidder_bundle_vars[noisy_bidder, frozenset(bundle)] == 1.0, 'initial_assignment'
+            welfare_program['model'].solve(pulp.PULP_CBC_CMD(msg=False))
+            sub_i_market_opt_welfare = pulp.value(welfare_program['model'].objective)
+        else:
+            sub_i_market_opt_welfare = self.welfare_upper_bound(noisy_bidder, bundle)
+        return sub_i_market_opt_welfare
 
     @staticmethod
     def eap_output_to_dataframes(result, folder_location):
@@ -208,30 +230,3 @@ class NoisyMarket(Market):
                                                         'n'],
                                                index=None)
         bidders_final_values_df.to_csv(f"{folder_location}bidders_final_values.csv", index=False)
-
-    def heuristic_upper_bound(self, noisy_bidder, bundle, welfare_program=None, ilp=True):
-        """
-        Computing heuristic upper bounds.
-        Idea: as a function of the size of the bundle, solve the ilp or the upper bound.
-        Intuition, if the bundle is LARGE, then the greedy upper bound should be very good.
-        If the bundle is small, then the greedy upper bound is not as good b/c it intersects too few other bundles.
-        """
-        if ilp:
-            # TODO: how about trying an approximation algorithm here?
-            # TODO: time the run of EAP by clock, give some budget: say 1 hour per run.
-            # TODO: if we know how long the ILP gets to run, then we know how many runs of it we can do in an hour.
-            # TODO: maybe we can do just a few runs of the ILP. Who to chose? Obvious candidate, pairs (i,S) with lowest lower bound.
-            # TODO: out of those that remain after quick pruning.
-            # TODO: there would be MANY pairs (i,S) to chose from, chose carefully.
-            # TODO: Is there a measure of "expected gain" = how much benefit we derived if we could prune this (i,S)?
-            # TODO: sounds like this is related to how much that (i, S) "resolves" conflicts.
-            # TODO: parallelize the algorithm: each run of the pruning test is independent of any other.
-            # Instead of re-building the ILP, we will change it and resolve it here.
-            if 'initial_assignment' in welfare_program['model'].constraints:
-                del welfare_program['model'].constraints['initial_assignment']
-            welfare_program['model'] += self._bidder_bundle_vars[noisy_bidder, frozenset(bundle)] == 1.0, 'initial_assignment'
-            welfare_program['model'].solve(pulp.PULP_CBC_CMD(msg=False))
-            sub_i_market_opt_welfare = pulp.value(welfare_program['model'].objective)
-        else:
-            sub_i_market_opt_welfare = self.welfare_upper_bound(noisy_bidder, bundle)
-        return sub_i_market_opt_welfare

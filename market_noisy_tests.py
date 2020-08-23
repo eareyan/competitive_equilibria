@@ -154,10 +154,9 @@ class MyTestCase(unittest.TestCase):
                                                       c=c)
         # MarketInspector.noisy_bidder_values(map_of_noisy_bidders[0])
         print(MarketInspector.noisy_bidder_values(map_of_noisy_bidders[0]))
-        print(result_eap)
-        # param_ptable, result_ptable, deep_dive_ptable = MarketInspector.inspect_elicitation_with_pruning(result_eap, noisy_market)
-        # print(param_ptable)
-        # print(result_ptable)
+        param_ptable, result_ptable, deep_dive_ptable = MarketInspector.inspect_elicitation_with_pruning(result_eap, noisy_market)
+        print(param_ptable)
+        print(result_ptable)
         # print(deep_dive_ptable)
 
     def test_pruning_algo(self):

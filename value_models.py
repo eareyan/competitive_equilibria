@@ -46,7 +46,9 @@ def solve_lsvm_world(json_world_loc, results_folder):
         assert len(bidder['values']) == 2 ** len(bidder['preferred_licences'])
         value_function = {frozenset({j for j in map_bundle_values['bundle']}): map_bundle_values['value']
                           for map_bundle_values in bidder['values']}
-        map_of_bidders[bidder['id']] = NoisyBidder(bidder['id'], value_function, my_noise_generator)
+        map_of_bidders[bidder['id']] = NoisyBidder(bidder_id=bidder['id'],
+                                                   map_base_bundles_to_values=value_function,
+                                                   noise_generator=my_noise_generator)
 
     # Construct the market object. The LSVM model has 18 goods.
     noisy_market = NoisyMarket({j for j in range(0, 18)}, set(map_of_bidders.values()))

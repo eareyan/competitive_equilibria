@@ -83,7 +83,7 @@ class MarketInspector:
         value_table = PrettyTable()
         value_table.title = f"Noisy Values for Bidder #{noisy_bidder.get_id()}"
         value_table.field_names = ['Bundle', 'Avg', 'Eps', 'Avg-Eps', 'Avg+Eps', 'N']
-        for bundle in noisy_bidder.get_map_base_bundles_to_values().keys():
+        for bundle in noisy_bidder.get_base_bundles():
             avg, eps, actual_num_samples = noisy_bidder.get_current_empirical_values(bundle)
             value_table.add_row([bundle,
                                  f"{avg : .4f}",

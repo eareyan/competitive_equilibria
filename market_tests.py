@@ -98,9 +98,13 @@ class MyTestCase(unittest.TestCase):
         trials_per_configuration = 10
         up_to_goods = 6
         up_to_bidders = 6
-        progress_bar = pkbar.Pbar(name='Testing many welfare max. allocations', target=trials_per_configuration * len(bidders.types_of_bidders) * (up_to_goods - 1) * (up_to_bidders - 1))
+        types_of_bidders = [bidders.Additive, bidders.AdditiveWithBudget]
+        progress_bar = pkbar.Pbar(name='Testing many welfare max. allocations', target=trials_per_configuration * len(types_of_bidders) * (up_to_goods - 1) * (up_to_bidders - 1))
         k = 0
-        for t, bidder_type, number_of_goods, number_of_bidders in it.product(range(0, trials_per_configuration), bidders.types_of_bidders, range(1, up_to_goods), range(1, up_to_bidders)):
+        for t, bidder_type, number_of_goods, number_of_bidders in it.product(range(0, trials_per_configuration),
+                                                                             types_of_bidders,
+                                                                             range(1, up_to_goods),
+                                                                             range(1, up_to_bidders)):
             progress_bar.update(k)
             k = k + 1
             # Create a random market with AWB valuations.
@@ -224,19 +228,11 @@ class MyTestCase(unittest.TestCase):
 
         set_of_goods = {0, 1, 2}
 
-        bidder_0 = bidders.SingleMinded(0, set_of_goods, random_init=False)
-        bidder_0.set_preferred_bundle({0, 2})
-        bidder_0.set_value(5)
+        bidder_0 = bidders.SingleMinded(0, frozenset({0, 2}), 5)
 
-        bidder_1 = bidders.SingleMinded(1, set_of_goods, random_init=False)
-        bidder_1.set_preferred_bundle({0, 1})
-        # bidder_1.set_preferred_bundle({good_1})
-        bidder_1.set_value(8)
+        bidder_1 = bidders.SingleMinded(1, frozenset({0, 1}), 8)
 
-        bidder_2 = bidders.SingleMinded(2, set_of_goods, random_init=False)
-        bidder_2.set_preferred_bundle({1, 2})
-        # bidder_2.set_preferred_bundle({good_0, good_1, good_2})
-        bidder_2.set_value(10)
+        bidder_2 = bidders.SingleMinded(2, frozenset({1, 2}), 10)
 
         sm_market = Market(set_of_goods, {bidder_0, bidder_1, bidder_2})
         # sm_market = Market(setOfGoods, {bidder_0, bidder_1})
@@ -288,22 +284,14 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(len(all_allocations), 64)
 
     def test_welfare_upper_bound(self):
-        map_of_goods = {i: i for i in range(0, 5)}
-        set_of_goods = set(map_of_goods.values())
 
         # Create single-minded bidders.
-        sm_bidder_0 = bidders.SingleMinded(0, set_of_goods, random_init=False)
-        sm_bidder_0.set_preferred_bundle({map_of_goods[0], map_of_goods[2]})
-        sm_bidder_0.set_value(10.0)
-        sm_bidder_1 = bidders.SingleMinded(1, set_of_goods, random_init=False)
-        sm_bidder_1.set_preferred_bundle({map_of_goods[1], map_of_goods[2]})
-        sm_bidder_1.set_value(1.0)
-        sm_bidder_2 = bidders.SingleMinded(2, set_of_goods, random_init=False)
-        sm_bidder_2.set_preferred_bundle(set_of_goods)
-        sm_bidder_2.set_value(5.0)
+        sm_bidder_0 = bidders.SingleMinded(0, frozenset({0, 2}), 10.0)
+        sm_bidder_1 = bidders.SingleMinded(1, frozenset({1, 2}), 1.0)
+        sm_bidder_2 = bidders.SingleMinded(2, frozenset({0, 1, 2, 3, 4}), 5.0)
 
         # Create market.
-        sm_market = Market(set_of_goods, {sm_bidder_0, sm_bidder_1, sm_bidder_2})
+        sm_market = Market(goods={0, 1, 2, 3, 4}, bidders={sm_bidder_0, sm_bidder_1, sm_bidder_2})
         print(bidders.SingleMinded.get_pretty_representation(sm_market))
 
         self.assertEqual(sm_market.welfare_upper_bound(sm_bidder_0, set()), 6.0)
