@@ -1,8 +1,10 @@
 import itertools as it
+import pprint
 import time
 from abc import abstractmethod
 from typing import Set, Dict, Tuple, List, Optional, FrozenSet, Union
 
+import pkbar
 import pulp
 
 
@@ -218,13 +220,12 @@ class Market:
         If the bundle is small, then it intersect few other bundles resulting in a higher welfare upper bound.
         If the bundle is large (say all), it intersects many other (say all) bundles resulting in a lower welfare upper bound.
         """
-        value = 0
+        value = allocated_bidder.value_query(allocated_bundle)
         for bidder in self._bidders:
             if bidder.get_id() != allocated_bidder.get_id():
-                # Find the welfare of this bidder
-                candidate_values = [bidder.value_query(bundle)
-                                    for bundle in bidder.get_base_bundles() if len(bundle.intersection(allocated_bundle)) == 0]
-                value += max(candidate_values) if len(candidate_values) > 0 else 0
+                # Find the welfare of this bidder that this bidder provides.
+                value += max([bidder.value_query(bundle) for bundle in bidder.get_base_bundles()
+                              if len(bundle.intersection(allocated_bundle)) == 0], default=0)
         return value
 
     def brute_force_welfare_max_solver(self):

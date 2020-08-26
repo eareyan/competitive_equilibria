@@ -116,7 +116,7 @@ class MyTestCase(unittest.TestCase):
         map_of_noisy_bidders = {i: NoisyBidder(i, {frozenset({2, 0}): 1}, lambda n: n) for i in range(0, 1)}
         map_of_noisy_bidders[0].sample_value_query(frozenset({2, 0}), 100, 0.1)
         # print(map_of_noisy_bidders[0].value_query({Good(0), Good(2)}))
-        self.assertEqual(map_of_noisy_bidders[0].value_query({0, 2}), 101)
+        self.assertEqual(map_of_noisy_bidders[0].value_query(frozenset({0, 2})), 101)
 
     def test_elicitation_algo(self):
         # Elicitation algorithm parameters.

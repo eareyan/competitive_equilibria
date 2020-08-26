@@ -8,6 +8,7 @@ import pulp
 from pkbar import pkbar
 
 from market import Market, Bidder
+from util import timing
 
 
 def get_noise_generator():
@@ -39,15 +40,15 @@ class NoisyBidder(Bidder):
         :param bundle: a bundle of goods.
         :return: a tuple (empirical average, epsilon, number of samples)
         """
-        return self._current_empirical_values[frozenset(bundle)]
+        return self._current_empirical_values[bundle]
 
     def value_query(self, bundle: Union[Set[int], FrozenSet[int]]) -> float:
         """
         :param bundle: a bundle of goods.
         :return: the current empirical average as the response to the value query for the given bundle.
         """
-        assert self._current_empirical_values[frozenset(bundle)][0] is not None
-        return self._current_empirical_values[frozenset(bundle)][0]
+        assert self._current_empirical_values[bundle][0] is not None
+        return self._current_empirical_values[bundle][0]
 
     def sample_value_query(self, bundle: FrozenSet[int], number_of_samples: int, epsilon: float):
         """
@@ -69,7 +70,6 @@ class NoisyMarket(Market):
         self._active_consumer_bundle_pair: Set[Tuple[Bidder, FrozenSet[int]]] = {(bidder, bundle)
                                                                                  for bidder in self.get_bidders()
                                                                                  for bundle in bidder.get_base_bundles()}
-        # pprint.pprint(self._active_consumer_bundle_pair)
 
     def elicit(self, number_of_samples: int, delta: float, c: float) -> float:
         """
@@ -98,46 +98,79 @@ class NoisyMarket(Market):
         :return: a dictionary with various pieces of data about the run of the algorithm.
         """
         assert len(sampling_schedule) == len(delta_schedule) and target_epsilon > 0
-        t0 = time.time()
         # Construct a dictionary with all the data we want to report back.
         result = {'market': self,
                   'sampling_schedule': sampling_schedule,
                   'delta_schedule': delta_schedule,
                   'target_epsilon': target_epsilon,
                   'c': c}
+        # Time the entire run of the algorithm.
+        t0 = time.time()
+
         # Main loop of the elicitation with pruning algorithm.
         for t, (number_of_samples, delta) in enumerate(zip(sampling_schedule, delta_schedule)):
+            print(f"\nIteration #{t}", end='')
 
-            # Sample all active bidders, bundle pairs.
-            hat_epsilon = self.elicit(number_of_samples, delta, c)
+            # Elicit values
+            hat_epsilon = timing(self.elicit, '\nEliciting values from active set')(number_of_samples, delta, c)
+
+            # Check terminating conditions.
             if hat_epsilon <= target_epsilon or len(self._active_consumer_bundle_pair) == 0 or t == len(sampling_schedule) - 1:
                 result['total_num_iterations'], result['actual_eps'], result['time'] = t + 1, hat_epsilon, time.time() - t0
                 return result
 
-            # The remaining code is all about trying to prune bidders, bundle pairs.
-            prune_set = set()
-            welfare_program = self.welfare_max_program()
-            opt_welfare = welfare_program['optimal_welfare']
-            progress_bar = pkbar.Pbar(name=f"Testing for prunability, iteration {t}", target=len(self._active_consumer_bundle_pair))
-            # Test if the (noisy_bidder, bundle) pair can be pruned by computing the optimal welfare when noisy_bidder gets the bundle.
-            for n, (noisy_bidder, bundle) in enumerate(self._active_consumer_bundle_pair):
-                progress_bar.update(n)
-                sub_i_market_opt_welfare = self.heuristic_upper_bound(noisy_bidder=noisy_bidder,
-                                                                      bundle=bundle,
-                                                                      welfare_program=welfare_program,
-                                                                      ilp=True)
-                # TODO is it that we should be checking here len(self.get_bidders()) or only those that remain active? If the latter, need to update paper.
-                if sub_i_market_opt_welfare + 2.0 * hat_epsilon * len(self.get_bidders()) < opt_welfare:
-                    # The line below sounded like a good idea but looks like it makes the solver take longer, why?
-                    # welfare_program['model'] += self._bidder_bundle_vars[noisy_bidder, frozenset(bundle)] == 0.0
-                    prune_set.add((noisy_bidder, bundle))
+            # Solve for the welfare-maximizing allocation for the entire market under current value estimates just once.
+            welfare_program = timing(self.welfare_max_program, 'Solving for the welfare-max alloc.')()
+
+            # Try a first fast pruning.
+            prune_set_first_pass, un_pruned_first_pass = self.prune(self._active_consumer_bundle_pair, hat_epsilon, welfare_program, ilp=False)
+            print(f"\t -> there were {len(prune_set_first_pass)} pairs pruned in the first pass, there remain {len(un_pruned_first_pass)} pairs.")
+
+            # Try a second, slower pruning. Bidder, bundle pairs not pruned in the first pass we try to prune now. We order by the upper bound and take top 180 (or whatever remains).
+            un_pruned_first_pass = [(bidder, bundle) for bidder, bundle, _ in sorted(un_pruned_first_pass, key=lambda x: x[2])][:int(180 / (t + 1))]
+            prune_set_second_pass, un_pruned_second_pass = self.prune(un_pruned_first_pass, hat_epsilon, welfare_program, ilp=True)
+            print(f"\t -> there were {len(prune_set_second_pass)} pairs pruned in the first pass, there remain {len(un_pruned_second_pass)} pairs.")
+
+            # The prune set is the union of the pairs pruned in the first pass with the pairs pruned in the second pass.
+            prune_set = prune_set_first_pass.union(prune_set_second_pass)
 
             # Eliminate from the active set those bidders, bundle pairs that are provably not part of the welfare-maximizing allocation.
             self._active_consumer_bundle_pair = self._active_consumer_bundle_pair - prune_set
 
+            # Second pass
+            print(f"There remains {len(self._active_consumer_bundle_pair)} many active pairs")
+
             # Record statistics.
             result[t] = {'_active_consumer_bundle_pair': self._active_consumer_bundle_pair,
                          'prune_set': prune_set}
+
+    def prune(self, candidate_bidder_bundle_pairs: List[Tuple[Bidder, FrozenSet[int]]], hat_epsilon: float, welfare_program, ilp: bool):
+        """
+        Pruning function. Returns a set of bidder, bundles to prune and a list of bidder, bundles pruned not pruned together with their
+        upper bound.
+        """
+        prune_set = set()
+        un_pruned = []
+        opt_welfare = welfare_program['optimal_welfare']
+        # Test if the (noisy_bidder, bundle) pair can be pruned by computing the optimal welfare when noisy_bidder gets the bundle.
+        progress_bar = pkbar.Pbar(name=f"Testing for prunability, ilp = {ilp}", target=len(candidate_bidder_bundle_pairs))
+        for n, (noisy_bidder, bundle) in enumerate(candidate_bidder_bundle_pairs):
+            progress_bar.update(n)
+            # print(f"\n\nTest pruning of pair ({noisy_bidder, bundle}")
+            sub_i_market_opt_welfare = self.heuristic_upper_bound(noisy_bidder=noisy_bidder,
+                                                                  bundle=bundle,
+                                                                  welfare_program=welfare_program,
+                                                                  ilp=ilp)
+
+            # TODO is it that we should be checking here len(self.get_bidders()) or only those that remain active? If the latter, need to update paper.
+            if sub_i_market_opt_welfare + 2.0 * hat_epsilon * len(self.get_bidders()) < opt_welfare:
+                # print(f"yes, prune b/c {sub_i_market_opt_welfare}, {2 * hat_epsilon * len(self.get_bidders())} =  {sub_i_market_opt_welfare + 2.0 * hat_epsilon * len(self.get_bidders())} < {opt_welfare}")
+                # The line below sounded like a good idea but looks like it makes the solver take longer, why?
+                # welfare_program['model'] += self._bidder_bundle_vars[noisy_bidder, frozenset(bundle)] == 0.0
+                prune_set.add((noisy_bidder, bundle))
+            else:
+                un_pruned.append((noisy_bidder, bundle, sub_i_market_opt_welfare + 2.0 * hat_epsilon * len(self.get_bidders())))
+        return prune_set, un_pruned
 
     def heuristic_upper_bound(self, noisy_bidder, bundle, welfare_program=None, ilp=True):
         """
@@ -156,6 +189,7 @@ class NoisyMarket(Market):
             # TODO: Is there a measure of "expected gain" = how much benefit we derived if we could prune this (i,S)?
             # TODO: sounds like this is related to how much that (i, S) "resolves" conflicts.
             # TODO: parallelize the algorithm: each run of the pruning test is independent of any other.
+            # TODO: is there a bound on the other side that will tell me immediately is something should NOT be pruned?
             # Instead of re-building the ILP, we will change it and resolve it here.
             if 'initial_assignment' in welfare_program['model'].constraints:
                 del welfare_program['model'].constraints['initial_assignment']
@@ -207,7 +241,7 @@ class NoisyMarket(Market):
             for bidder in result['market'].get_bidders():
                 for bundle in bidder.get_base_bundles():
                     # print(bidder, bundle, (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair'])
-                    pruning_evolution_detail += [[t, bidder.get_id(), [good.get_id() for good in bundle], (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair']]]
+                    pruning_evolution_detail += [[t, bidder.get_id(), [good for good in bundle], (bidder, frozenset(bundle)) in result[t]['_active_consumer_bundle_pair']]]
         pruning_evolution_detail_df = pd.DataFrame(pruning_evolution_detail,
                                                    columns=['iteration', 'bidder', 'bundle', 'active'],
                                                    index=None)
@@ -218,7 +252,7 @@ class NoisyMarket(Market):
         for noisy_bidder in result['market'].get_bidders():
             for bundle in noisy_bidder.get_base_bundles():
                 avg, eps, actual_num_samples = noisy_bidder.get_current_empirical_values(bundle)
-                bidder_final_values += [[noisy_bidder.get_id(), [good.get_id() for good in bundle], avg, eps, avg - eps, avg + eps, actual_num_samples]]
+                bidder_final_values += [[noisy_bidder.get_id(), [good for good in bundle], avg, eps, avg - eps, avg + eps, actual_num_samples]]
 
         bidders_final_values_df = pd.DataFrame(bidder_final_values,
                                                columns=['bidder',
