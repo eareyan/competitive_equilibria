@@ -1,8 +1,5 @@
 # Install command line tools needed.
-sudo apt-get install -y git
-sudo apt-get install -y zip
-sudo apt-get install -y screen
-sudo apt-get install -y python3-venv
+sudo apt-get install -y git zip screen python3-venv
 
 # Clone the repo
 git clone https://eareyan@github.com/eareyan/competitive_equilibria.git
