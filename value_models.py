@@ -68,7 +68,7 @@ def solve_value_model_world(json_world_loc, results_folder):
                                                   delta_schedule=[0.1 / 4 for _ in range(1, 5)],
                                                   # The following is for development purposes.
                                                   # pruning_schedule=[1 for _ in range(1, 5)] if the_model_type == "lsvm" else [1 for _ in range(1, 5)],
-                                                  pruning_schedule=[int(180 / t) for t in range(1, 5)] if the_model_type == "lsvm" else [4480 for _ in range(1, 5)],
+                                                  pruning_schedule=[int(180 / t) for t in range(1, 5)] if the_model_type == "LSVM" else [4480 for _ in range(1, 5)],
                                                   target_epsilon=0.0001,
                                                   c=my_c)
 
