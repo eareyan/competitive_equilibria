@@ -1,10 +1,8 @@
 import itertools as it
-import pprint
 import time
 from abc import abstractmethod
 from typing import Set, Dict, Tuple, List, Optional, FrozenSet, Union
 
-import pkbar
 import pulp
 
 

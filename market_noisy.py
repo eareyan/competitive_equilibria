@@ -89,10 +89,11 @@ class NoisyMarket(Market):
             noisy_bidder.sample_value_query(bundle, number_of_samples, epsilon)
         return epsilon
 
-    def elicit_with_pruning(self, sampling_schedule: List[int], delta_schedule: List[float], target_epsilon: float, c: float):
+    def elicit_with_pruning(self, sampling_schedule: List[int], delta_schedule: List[float], pruning_schedule: List[int], target_epsilon: float, c: float):
         """
         :param sampling_schedule: a sequence of increase integers, each integer equal to the number of samples for the corresponding iteration.
         :param delta_schedule: a sequence of floats, each in the range (0, 1) and whose sum is in (0, 1), each denoting the probability for each iteration.
+        :param pruning_schedule: a sequence of integers of the same lenght as sampling_scheduling denoting the top n pairs to prune at each iteration.
         :param target_epsilon: the desired final epsilon.
         :param c: the range of the noise when sampling bidders' values.
         :return: a dictionary with various pieces of data about the run of the algorithm.
@@ -127,7 +128,7 @@ class NoisyMarket(Market):
             print(f"\t -> there were {len(prune_set_first_pass)} pairs pruned in the first pass, there remain {len(un_pruned_first_pass)} pairs.")
 
             # Try a second, slower pruning. Bidder, bundle pairs not pruned in the first pass we try to prune now. We order by the upper bound and take top 180 (or whatever remains).
-            un_pruned_first_pass = [(bidder, bundle) for bidder, bundle, _ in sorted(un_pruned_first_pass, key=lambda x: x[2])][:int(180 / (t + 1))]
+            un_pruned_first_pass = [(bidder, bundle) for bidder, bundle, _ in sorted(un_pruned_first_pass, key=lambda x: x[2])][:pruning_schedule[t]]
             prune_set_second_pass, un_pruned_second_pass = self.prune(un_pruned_first_pass, hat_epsilon, welfare_program, ilp=True)
             print(f"\t -> there were {len(prune_set_second_pass)} pairs pruned in the first pass, there remain {len(un_pruned_second_pass)} pairs.")
 

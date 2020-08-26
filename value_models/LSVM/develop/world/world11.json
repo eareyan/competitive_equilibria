@@ -1,0 +1,129 @@
+{
+  "bidder_values": [
+    {
+      "id": 1,
+      "preferred_licences": [
+        1,
+        2,
+        3
+      ],
+      "values": [
+        {
+          "bundle": [],
+          "value": 0E-8
+        },
+        {
+          "bundle": [
+            3
+          ],
+          "value": 5.67586032
+        },
+        {
+          "bundle": [
+            1
+          ],
+          "value": 18.29181173
+        },
+        {
+          "bundle": [
+            2
+          ],
+          "value": 20.33468685
+        },
+        {
+          "bundle": [
+            1,
+            3
+          ],
+          "value": 23.96767206
+        },
+        {
+          "bundle": [
+            2,
+            3
+          ],
+          "value": 28.78700237
+        },
+        {
+          "bundle": [
+            1,
+            2
+          ],
+          "value": 42.74962380
+        },
+        {
+          "bundle": [
+            1,
+            2,
+            3
+          ],
+          "value": 58.89677252
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "preferred_licences": [
+        0,
+        1
+      ],
+      "values": [
+        {
+          "bundle": [],
+          "value": 0E-8
+        },
+        {
+          "bundle": [
+            1
+          ],
+          "value": 11.87341551
+        },
+        {
+          "bundle": [
+            0
+          ],
+          "value": 20.28491754
+        },
+        {
+          "bundle": [
+            0,
+            1
+          ],
+          "value": 35.59102405
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "preferred_licences": [
+        3,
+        4
+      ],
+      "values": [
+        {
+          "bundle": [],
+          "value": 0E-8
+        },
+        {
+          "bundle": [
+            3
+          ],
+          "value": 10.86322812
+        },
+        {
+          "bundle": [
+            4
+          ],
+          "value": 20.54732095
+        },
+        {
+          "bundle": [
+            3,
+            4
+          ],
+          "value": 34.76341904
+        }
+      ]
+    }
+  ]
+}

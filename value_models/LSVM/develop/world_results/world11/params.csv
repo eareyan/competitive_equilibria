@@ -1,0 +1,8 @@
+parameter,value
+sampling_schedule,"[10, 100, 1000, 10000]"
+delta_schedule,"[0.025, 0.025, 0.025, 0.025]"
+target_epsilon,0.0001
+c,2
+time,13.493816137313843
+total_num_iterations,4
+actual_eps,0.1111196301640888
