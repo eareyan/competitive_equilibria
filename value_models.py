@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     # Other parameters
     experiment_number = 0
-    number_of_worlds = 100
+    number_of_worlds = 50
     experiment_base_location = f"{base_path}{experiment_number}/"
 
     # Create base directories.

@@ -24,4 +24,6 @@ EOF
 source /etc/profile.d/jdk14.sh
 
 # Create output directory and run experiments.
-screen -dmS /home/enriqueareyan/competitive_equilibria/venv/bin/python value_models.py output/
+screen -dm bash -c 'python value_models.py GSVM output/GSVM/'
+screen -dm bash -c 'python value_models.py LSVM output/LSVM/'
+
