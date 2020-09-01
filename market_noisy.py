@@ -17,10 +17,10 @@ def get_noise_generator():
     c = b - a
 
     # A uniform noise generator.
-    def noise_generator(num_samples):
+    def uniform_noise_generator(num_samples):
         return np.random.uniform(a, b, num_samples)
 
-    return noise_generator, c
+    return uniform_noise_generator, c
 
 
 class NoisyBidder(Bidder):
@@ -130,7 +130,7 @@ class NoisyMarket(Market):
             # Try a second, slower pruning. Bidder, bundle pairs not pruned in the first pass we try to prune now. We order by the upper bound and take top 180 (or whatever remains).
             un_pruned_first_pass = [(bidder, bundle) for bidder, bundle, _ in sorted(un_pruned_first_pass, key=lambda x: x[2])][:pruning_schedule[t]]
             prune_set_second_pass, un_pruned_second_pass = self.prune(un_pruned_first_pass, hat_epsilon, welfare_program, ilp=True)
-            print(f"\t -> there were {len(prune_set_second_pass)} pairs pruned in the first pass, there remain {len(un_pruned_second_pass)} pairs.")
+            print(f"\t -> there were {len(prune_set_second_pass)} pairs pruned in the second pass, there remain {len(un_pruned_second_pass)} pairs.")
 
             # The prune set is the union of the pairs pruned in the first pass with the pairs pruned in the second pass.
             prune_set = prune_set_first_pass.union(prune_set_second_pass)
@@ -143,7 +143,9 @@ class NoisyMarket(Market):
 
             # Record statistics.
             result[t] = {'_active_consumer_bundle_pair': self._active_consumer_bundle_pair,
-                         'prune_set': prune_set}
+                         'prune_set': prune_set,
+                         'prune_1st_pass': prune_set_first_pass,
+                         'prune_2nd_pass': prune_set_second_pass}
 
     def prune(self, candidate_bidder_bundle_pairs: List[Tuple[Bidder, FrozenSet[int]]], hat_epsilon: float, welfare_program, ilp: bool):
         """
@@ -228,11 +230,15 @@ class NoisyMarket(Market):
             [
                 [t,
                  len(result[t]['_active_consumer_bundle_pair']),
-                 len(result[t]['prune_set'])] for t in range(0, result['total_num_iterations'] - 1)
+                 len(result[t]['prune_set']),
+                 len(result[t]['prune_1st_pass']),
+                 len(result[t]['prune_2nd_pass'])] for t in range(0, result['total_num_iterations'] - 1)
             ],
             columns=['end_of_iteration',
                      'active',
-                     'pruned'],
+                     'pruned',
+                     'pruned_1st_pass',
+                     'pruned_2nd_pass'],
             index=None)
         pruning_evolution_summary_df.to_csv(f"{folder_location}pruning_evolution_summary.csv", index=False)
 

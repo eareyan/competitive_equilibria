@@ -67,7 +67,7 @@ def solve_value_model_world(json_world_loc,
     params_table.add_row(['json_world_loc', json_world_loc])
     params_table.add_row(['results_folder', results_folder])
     params_table.add_row(['sampling_schedule', sampling_schedule])
-    params_table.add_row(['noise_generator', noise_generator])
+    params_table.add_row(['noise_generator', noise_generator.__name__])
     params_table.add_row(['c', c])
     print(params_table)
 
@@ -99,7 +99,7 @@ def solve_value_model_world(json_world_loc,
     result_eap = noisy_market.elicit_with_pruning(sampling_schedule=sampling_schedule,
                                                   delta_schedule=delta_schedule,
                                                   # The following is for development purposes.
-                                                  # pruning_schedule=[1 for _ in range(1, 5)] if the_model_type == "lsvm" else [1 for _ in range(1, 5)],
+                                                  # pruning_schedule=[1 for _ in range(1, 5)] if the_model_type == 'LSVM' else [1 for _ in range(1, 5)],
                                                   pruning_schedule=[int(180 / t) for t in range(1, 5)] if the_model_type == "LSVM" else [4480 for _ in range(1, 5)],
                                                   target_epsilon=0.0001,
                                                   c=c)
@@ -116,11 +116,14 @@ if __name__ == "__main__":
     # Command-line parameters
     the_model_type = sys.argv[1]
     base_path = sys.argv[2]
+    if the_model_type != 'LSVM' and the_model_type != 'GSVM':
+        raise Exception("The model type must be either LSVM or GSVM")
     print(f"model_type = {the_model_type}, and base_path = {base_path}")
 
     # Other parameters
     experiment_number = 0
     number_of_worlds = 30
+    # number_of_worlds = 1
     experiment_base_location = f"{base_path}{experiment_number}/"
 
     # Create base directories.
@@ -151,8 +154,13 @@ if __name__ == "__main__":
         the_delta_schedule = [0.1 / 4 for _ in range(1, 5)]
 
         # Solve the worlds for each sampling schedule
-        candidate_eps = [1.0, 0.5, 0.25, 0.125]
-        the_noise_generator, the_c = get_noise_generator()
+        # candidate_eps = [1.0, 0.5, 0.25, 0.125]
+        candidate_eps = [10.0, 5.0, 2.5, 1.25]
+        the_noise_generator, noise_c = get_noise_generator()
+
+        # The value of c, i.e., the range of values, depends on the value model.
+        # Here I put some values that are close to the maximum range observed when drawing a few LSVM and GSVM markets.
+        the_c = noise_c + (500 if the_model_type == 'LSVM' else 400)
 
         # For each candidate epsilon, run an experiment.
         for eps in candidate_eps:
