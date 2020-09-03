@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import zipfile
+from typing import List
 
 import pandas as pd
 from prettytable import PrettyTable
@@ -46,17 +47,19 @@ def draw_value_model_world(model_type, location, name):
     return f"{location}worlds/world{name}.zip"
 
 
-def solve_value_model_world(json_world_loc,
-                            results_folder,
-                            sampling_schedule,
-                            delta_schedule,
+def solve_value_model_world(json_world_loc: str,
+                            results_folder: str,
+                            sampling_schedule: List[int],
+                            pruning_schedule: List[int],
+                            delta_schedule: List[float],
                             noise_generator,
-                            c):
+                            c: float):
     """
     Reads in a world (LSVM or GSVM) and saves various .csv files with information about elicitation with pruning.
     :param json_world_loc: the location of a json file defining a LSVM or GSVM market.
     :param results_folder: the folder where to store results, i.e., various .csv files.
     :param sampling_schedule:
+    :param pruning_schedule:
     :param delta_schedule:
     :param noise_generator:
     :param c:
@@ -67,6 +70,8 @@ def solve_value_model_world(json_world_loc,
     params_table.add_row(['json_world_loc', json_world_loc])
     params_table.add_row(['results_folder', results_folder])
     params_table.add_row(['sampling_schedule', sampling_schedule])
+    params_table.add_row(['pruning_schedule', pruning_schedule])
+    params_table.add_row(['delta_schedule', delta_schedule])
     params_table.add_row(['noise_generator', noise_generator.__name__])
     params_table.add_row(['c', c])
     print(params_table)
@@ -98,9 +103,7 @@ def solve_value_model_world(json_world_loc,
     # Run elicitation with pruning (EAP).
     result_eap = noisy_market.elicit_with_pruning(sampling_schedule=sampling_schedule,
                                                   delta_schedule=delta_schedule,
-                                                  # The following is for development purposes.
-                                                  # pruning_schedule=[1 for _ in range(1, 5)] if the_model_type == 'LSVM' else [1 for _ in range(1, 5)],
-                                                  pruning_schedule=[int(180 / t) for t in range(1, 5)] if the_model_type == "LSVM" else [4480 for _ in range(1, 5)],
+                                                  pruning_schedule=pruning_schedule,
                                                   target_epsilon=0.0001,
                                                   c=c)
 
@@ -116,8 +119,8 @@ if __name__ == "__main__":
     # Command-line parameters
     the_model_type = sys.argv[1]
     base_path = sys.argv[2]
-    if the_model_type != 'LSVM' and the_model_type != 'GSVM':
-        raise Exception("The model type must be either LSVM or GSVM")
+    if the_model_type != 'LSVM' and the_model_type != 'LSVM2' and the_model_type != 'GSVM':
+        raise Exception("The model type must be either LSVM, LSVM2 or GSVM")
     print(f"model_type = {the_model_type}, and base_path = {base_path}")
 
     # Other parameters
@@ -153,6 +156,17 @@ if __name__ == "__main__":
         # One fix delta schedule
         the_delta_schedule = [0.1 / 4 for _ in range(1, 5)]
 
+        # One fixed pruning schedule as a function of the model type.
+        the_pruning_schedule = None
+        if the_model_type == "LSVM":
+            the_pruning_schedule = [int(180 / t) for t in range(1, 5)]
+        elif the_model_type == "LSVM2":
+            the_pruning_schedule = [int(the_size_of_market / t) for t in range(1, 5)]
+        elif the_model_type == "GSVM":
+            the_pruning_schedule = [4480 for _ in range(1, 5)]
+        # The following is for development purposes.
+        # pruning_schedule=[1 for _ in range(1, 5)]
+
         # Solve the worlds for each sampling schedule
         # candidate_eps = [1.0, 0.5, 0.25, 0.125]
         candidate_eps = [10.0, 5.0, 2.5, 1.25]
@@ -181,6 +195,7 @@ if __name__ == "__main__":
             solve_value_model_world(json_world_loc=f"{base_path}{experiment_number}/worlds/world{number_world}.zip",
                                     results_folder=complete_results_folder,
                                     sampling_schedule=the_sampling_schedule,
+                                    pruning_schedule=the_pruning_schedule,
                                     delta_schedule=the_delta_schedule,
                                     noise_generator=the_noise_generator,
                                     c=the_c)
