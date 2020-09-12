@@ -316,7 +316,12 @@ class Market:
         t0_initial = time.time()
 
         # Generate the pulp problem. The problem is to find a CE pricing that maximizes revenue.
-        model = pulp.LpProblem('Pricing_Problem', pulp.LpMaximize)
+        model = pulp.LpProblem('Pricing_Problem', pulp.LpMinimize)
+
+        # Generate slack variables. The slack variable is per (base bundle, bidder) pair, so that UM does not fail
+        slacks = pulp.LpVariable.dicts('slack', ((bidder, bundle) for bidder in self._bidders for bundle in bidder.get_base_bundles()), lowBound=0.0)
+        # The objective is to minimize the slack.
+        model += pulp.lpSum([slack for slack in slacks.values()])
 
         # Get the prices for bundles.
         map_bundle_to_price: Dict[Union[Tuple[int], Set[int], FrozenSet[int]], pulp.LpAffineExpression]
@@ -328,16 +333,17 @@ class Market:
             value_for_allocated_bundle = bidder.value_query(allocation[bidder]) if bidder in allocation else 0.0
             price_for_allocated_bundle = map_bundle_to_price[allocation[bidder]] if bidder in allocation else 0.0
             # Generate utility-maximization for this bidder.
-            # @TODO should not enumerate all bundles but only those that are relevant, as now done in the welfare-max program.
-            for bundle in Bidder.get_set_of_all_bundles(len(self._goods)):
-                value_of_bundle = bidder.value_query(set(bundle))
+            for bundle in bidder.get_base_bundles():
+                value_of_bundle = bidder.value_query(bundle)
                 price_of_bundle = map_bundle_to_price[bundle]
-                model += value_of_bundle - price_of_bundle <= value_for_allocated_bundle - price_for_allocated_bundle
+                model += value_of_bundle - price_of_bundle - slacks[(bidder, bundle)] <= value_for_allocated_bundle - price_for_allocated_bundle
+                # model += value_of_bundle - price_of_bundle <= value_for_allocated_bundle - price_for_allocated_bundle
 
         # (2) Generate revenue-maximization constraints for auctioneer, i.e., the revenue of the allocation must be greater than any other allocation.
-        revenue = pulp.lpSum([map_bundle_to_price[bidder_alloc] for bidder_alloc in allocation.values()])
-        for allocation in self.enumerate_all_allocations():
-            model += revenue >= pulp.lpSum([map_bundle_to_price[frozenset(bundle)] for bundle in allocation.values()])
+        # TODO: for now, these constraints are not active since I am considering only linear prices for the value experiments for noisy CM submission.
+        # revenue = pulp.lpSum([map_bundle_to_price[bidder_alloc] for bidder_alloc in allocation.values()])
+        # for allocation in self.enumerate_all_allocations():
+        #     model += revenue >= pulp.lpSum([map_bundle_to_price[frozenset(bundle)] for bundle in allocation.values()])
 
         # TODO the way the revenue constraints are generated can be optimized, as there are currently lots of redundant constraints
         """ 
@@ -361,6 +367,9 @@ class Market:
 
         # Return the prices variables.
         result['output_prices'] = list_of_prices_vars
+
+        # Return slack variables.
+        result['slack_variables'] = slacks
 
         # Check the status of the model. Is it feasible?
         result['status'] = pulp.LpStatus[model.status]
@@ -402,3 +411,19 @@ class Market:
             new_goods = [good for good in goods if good not in current_bundle]
             all_allocations += Market.__enumerate_all_allocations_helper(new_goods, new_bidders, new_allocation)
         return all_allocations
+
+    def compute_um_violation(self, allocation: Dict[int, FrozenSet[int]], pricing: Dict[int, float]):
+        """
+        Given an allocation and a pricing for this market, compute the UM Loss.
+        UM Loss is the maximum utility lost among bidders.
+        :param allocation:
+        :param pricing:
+        """
+        bidders_um_loss = []
+        for bidder in self._bidders:
+            actual_utility = 0
+            if bidder.get_id() in allocation:
+                actual_utility = bidder.value_query(allocation[bidder.get_id()]) - sum([pricing[good] for good in allocation[bidder.get_id()]])
+            max_utility = max([bidder.value_query(bundle) - sum([pricing[good] for good in bundle]) for bundle in bidder.get_base_bundles()])
+            bidders_um_loss.append(max_utility - actual_utility)
+        return max(bidders_um_loss)

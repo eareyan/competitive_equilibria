@@ -1,9 +1,18 @@
 import random
-from typing import Set, Dict, FrozenSet
+from typing import Set, Dict, FrozenSet, Union, Optional
 
 from prettytable import PrettyTable
 
 from market import Market, Bidder
+
+
+class TabularBidder(Bidder):
+    def __init__(self, bidder_id: int, base_bundles: Optional[Set[FrozenSet[int]]], values: Dict[FrozenSet[int], float]):
+        super().__init__(bidder_id, base_bundles)
+        self.values = values
+
+    def value_query(self, bundle: Union[Set[int], FrozenSet[int]]) -> float:
+        return self.values[bundle]
 
 
 class Additive(Bidder):

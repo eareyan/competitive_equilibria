@@ -1,16 +1,13 @@
-import json
 import math
 import os
 import sys
 import time
-import zipfile
 from typing import List
 
-import pandas as pd
 from prettytable import PrettyTable
 
 from market_noisy import NoisyMarket, NoisyBidder, get_noise_generator
-from util import timing
+from util import timing, read_json_from_zip
 
 
 def compute_n(c, delta, epsilon, size_of_market):
@@ -26,17 +23,6 @@ def compute_size_world(json_world_loc):
     return sum([len(bidder['values']) for bidder in data['bidder_values']])
 
 
-def read_json_from_zip(json_world_loc):
-    """
-    Reads a JSON file from a zip file.
-    """
-    with zipfile.ZipFile(json_world_loc, "r") as z:
-        for filename in z.namelist():
-            with z.open(filename) as f:
-                data = json.loads(f.read().decode("utf-8"))
-    return data
-
-
 def draw_value_model_world(model_type, location, name):
     """
     Draws one world.
@@ -45,6 +31,29 @@ def draw_value_model_world(model_type, location, name):
     os.system(f"zip {location}worlds/world{name}.zip {location}worlds/world{name}.json")
     os.system(f"rm {location}worlds/world{name}.json")
     return f"{location}worlds/world{name}.zip"
+
+
+def construct_value_model_from_json(json_world_loc, noise_generator):
+    # Read and (time it) JSON file with world model from a zip file.
+    data = timing(read_json_from_zip, 'Reading in JSON file')(json_world_loc)
+
+    # Parse model into a market.
+    map_of_bidders = {}
+
+    print("Reading in bidders value functions")
+    for i, bidder in enumerate(data['bidder_values']):
+        t0 = time.time()
+        # Just making sure that the value function is of the right length, i.e., all subsets of the preferred licenses.
+        assert len(bidder['values']) == 2 ** len(bidder['preferred_licences'])
+        value_function = {frozenset({j for j in map_bundle_values['bundle']}): map_bundle_values['value']
+                          for map_bundle_values in bidder['values']}
+        map_of_bidders[bidder['id']] = NoisyBidder(bidder_id=bidder['id'],
+                                                   map_base_bundles_to_values=value_function,
+                                                   noise_generator=noise_generator)
+        print(f"\tBidder #{bidder['id']} done, took {time.time() - t0 : .4f}s")
+
+    # Construct the market object. The value models have 18 goods.
+    return timing(NoisyMarket, '\nConstructing Market')({j for j in range(0, 18)}, set(map_of_bidders.values()))
 
 
 def solve_value_model_world(json_world_loc: str,
@@ -76,30 +85,9 @@ def solve_value_model_world(json_world_loc: str,
     params_table.add_row(['c', c])
     print(params_table)
 
-    # Read and (time it) JSON file with world model from a zip file.
-    data = timing(read_json_from_zip, 'Reading in JSON file')(json_world_loc)
-
-    # Parse model into a market.
-    map_of_bidders = {}
-    pd.DataFrame([[bidder['id'], bidder['preferred_licences']] for bidder in data['bidder_values']],
-                 columns=['bidder', 'preferred_licences'],
-                 index=None).to_csv(f"{results_folder}bidders_summary.csv", index=False)
-
-    print("Reading in bidders value functions")
-    for i, bidder in enumerate(data['bidder_values']):
-        t0 = time.time()
-        # Just making sure that the value function is of the right length, i.e., all subsets of the preferred licenses.
-        assert len(bidder['values']) == 2 ** len(bidder['preferred_licences'])
-        value_function = {frozenset({j for j in map_bundle_values['bundle']}): map_bundle_values['value']
-                          for map_bundle_values in bidder['values']}
-        map_of_bidders[bidder['id']] = NoisyBidder(bidder_id=bidder['id'],
-                                                   map_base_bundles_to_values=value_function,
+    # Construct the noisy market from the location of the zipped json world.
+    noisy_market = construct_value_model_from_json(json_world_loc=world_location,
                                                    noise_generator=noise_generator)
-        print(f"\tBidder #{bidder['id']} done, took {time.time() - t0 : .4f}s")
-
-    # Construct the market object. The value models have 18 goods.
-    noisy_market = timing(NoisyMarket, '\nConstructing Market')({j for j in range(0, 18)}, set(map_of_bidders.values()))
-
     # Run elicitation with pruning (EAP).
     result_eap = noisy_market.elicit_with_pruning(sampling_schedule=sampling_schedule,
                                                   delta_schedule=delta_schedule,

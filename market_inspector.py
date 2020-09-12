@@ -42,6 +42,19 @@ def pretty_print_pricing(result):
     return pricing_stats_ptable
 
 
+def pretty_print_prices_slack(result, only_positive=False):
+    pricing_slack_ptable = PrettyTable()
+    pricing_slack_ptable.title = 'Pricing Slack'
+    pricing_slack_ptable.field_names = ['Bidder', 'Bundle', 'Slack']
+    for (i, bundle), v in result['slack_variables'].items():
+        if not only_positive:
+            pricing_slack_ptable.add_row([i, bundle, v.varValue])
+        else:
+            if v.varValue > 0:
+                pricing_slack_ptable.add_row([i, bundle, v.varValue])
+    return pricing_slack_ptable
+
+
 def welfare_max_stats_table(result):
     """
     Creates a pretty table with various of the ilp's solver statistics.

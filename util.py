@@ -1,4 +1,6 @@
+import json
 import time
+import zipfile
 from functools import wraps
 
 
@@ -12,3 +14,14 @@ def timing(f, before_message):
         return result
 
     return wrap
+
+
+def read_json_from_zip(json_world_loc):
+    """
+    Reads a JSON file from a zip file.
+    """
+    with zipfile.ZipFile(json_world_loc, "r") as z:
+        for filename in z.namelist():
+            with z.open(filename) as f:
+                data = json.loads(f.read().decode("utf-8"))
+    return data
