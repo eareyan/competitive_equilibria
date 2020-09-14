@@ -1,9 +1,39 @@
+import os
 import itertools as it
+from pathlib import Path
+from shutil import copytree, copy
+
 import pandas as pd
 
 from bidders import TabularBidder
 from market import Market
 from util import timing, read_json_from_zip
+
+
+def consolidate_results(source_location, target_location):
+    # Create a couple of folders to consolidate results.
+    Path(f"{target_location}worlds").mkdir(parents=True, exist_ok=True)
+    Path(f"{target_location}worlds_results").mkdir(parents=True, exist_ok=True)
+    folders = [int(x) for x in list(filter(lambda x: os.path.isdir(f"{source_location}{x}") and
+                                                     os.path.isdir(f"{source_location}{x}/worlds") and
+                                                     os.path.isdir(f"{source_location}{x}/worlds_results"), os.listdir(source_location)))]
+    folders = sorted(folders)
+    world_count = 0
+    for folder in folders:
+        worlds_location = [int(x[5:-4]) for x in list(filter(lambda x: x[0:5] == 'world', os.listdir(f"{source_location}{folder}/worlds")))]
+        worlds_location = sorted(worlds_location)
+        print(worlds_location)
+        for world in worlds_location:
+            source_world = f"{source_location}{folder}/worlds/world{world}.zip"
+            target_world = f"{target_location}/worlds/world{world_count}.zip"
+            print(source_world, target_world)
+            copy(source_world, target_world)
+
+            source_world_results = f"{source_location}{folder}/worlds_results/world{world}"
+            target_world_results = f"{target_location}/worlds_results/world{world_count}"
+            print(source_world_results, target_world_results)
+            copytree(source_world_results, target_world_results)
+            world_count += 1
 
 
 def read_value_model_into_market(json_world_loc):
@@ -54,48 +84,64 @@ def save_outcome(market, location):
                  columns=['bidder', 'bundle', 'slack']).to_csv(f'{location}um_violations.csv', index=False)
 
 
-def save_expt_outcomes():
-    for e, n, eps in it.product([0, 1], range(0, 10), [1.25, 2.5, 5.0, 10.0]):
-        # Experiment location
-        # experiment_location = f"value_models_experiments/GSVM/{e}/worlds_results/world{n}/eps_{eps}/"
-        experiment_location = f"value_models_experiments/LSVM/{e}/worlds_results/world{n}/eps_{eps}/"
-        print(experiment_location)
+def save_expt_outcomes(model_type, e, n, eps):
+    # Experiment location
+    experiment_location = f"value_models_experiments/{model_type}/{e}/worlds_results/world{n}/eps_{eps}/"
+    print(experiment_location)
+    if os.path.exists(f"{experiment_location}optimal_allocation.csv"):
+        print("Already done!")
+        return
 
-        # Read the experiment and create the market.
-        experiment_market = read_experiment(experiment_location)
+    # Read the experiment and create the market.
+    experiment_market = read_experiment(experiment_location)
 
-        # Save experiment's outcome.
-        save_outcome(experiment_market, experiment_location)
+    # Save experiment's outcome.
+    save_outcome(experiment_market, experiment_location)
 
 
-def compute_expt_um_loss(model_type, e, n, eps):
+def compute_expt_um_loss(model_type, n, eps):
     # Read the optimal allocation from the experiment.
-    optimal_allocation = pd.read_csv(f"value_models_experiments/{model_type}/{e}/worlds_results/world{n}/eps_{eps}/optimal_allocation.csv")
+    optimal_allocation = pd.read_csv(f"value_models_experiments/{model_type}/worlds_results/world{n}/eps_{eps}/optimal_allocation.csv")
     allocation = {row[1]: frozenset(eval(row[2])) for row in optimal_allocation.itertuples()}
     # Read the approximate UM pricing from the experiment.
-    approx_um_pricing = pd.read_csv(f"value_models_experiments/{model_type}/{e}/worlds_results/world{n}/eps_{eps}/approx_um_pricing.csv")
+    approx_um_pricing = pd.read_csv(f"value_models_experiments/{model_type}/worlds_results/world{n}/eps_{eps}/approx_um_pricing.csv")
     pricing = {row[1]: row[2] for row in approx_um_pricing.itertuples()}
 
     # Ground-truth World location
-    the_json_world_loc = f"value_models_experiments/{model_type}/{e}/worlds/world{n}.zip"
+    the_json_world_loc = f"value_models_experiments/{model_type}/worlds/world{n}.zip"
     # Construct the ground-truth value model from the zipped json file.
     the_market = timing(read_value_model_into_market, f"Reading in value model in {the_json_world_loc}")(the_json_world_loc)
 
-    # Compute UMLoss of the experiment's outcome (allocation, pricing) on the groung-truth market.
+    # Compute UMLoss of the experiment's outcome (allocation, pricing) on the ground-truth market.
     um_loss = the_market.compute_um_violation(allocation=allocation, pricing=pricing)
 
     return um_loss
 
 
+def does_market_clear(model_type, n, eps):
+    return 1 if pd.read_csv(f"value_models_experiments/{model_type}/worlds_results/world{n}/eps_{eps}/um_violations.csv").empty else 0
+
+
 if __name__ == "__main__":
+    # Step 0, consolidate results, if necessary.
+    # consolidate_results('value_models_experiments/LSVM/', 'value_models_experiments/consolidated/LSVM/')
+    # consolidate_results('value_models_experiments/GSVM/', 'value_models_experiments/consolidated/GSVM/')
+
     # Step 1, save experiments outcomes.
-    # save_expt_outcomes()
+    # for model_type, e, n, eps in it.product(['LSVM'], [0, 1, 2, 3, 4, 5, 6, 7], range(0, 5), [1.25, 2.5, 5.0, 10.0]):
+    #    save_expt_outcomes(model_type=model_type, e=e, n=n, eps=eps)
 
     # Step 2, compute UM loss.
-    # params = [['GSVM'], [0, 1], range(0, 20)]
-    params = [['LSVM'], [0], range(0, 10)]
+    # params = [['GSVM'], range(0, 40)]
+    params = [['LSVM'], range(0, 50)]
 
-    um_loss_data = [[compute_expt_um_loss(model_type=model_type, e=e, n=n, eps=eps)
-                     for eps in [1.25, 2.5, 5.0, 10.0]]
-                    for model_type, e, n in it.product(*params)]
-    pd.DataFrame(um_loss_data, columns=[1.25, 2.5, 5.0, 10.0]).to_csv(f"value_models_experiments/summary/{params[0][0]}_UM_Loss.csv", index=False)
+    # um_loss_data = [[n] + [compute_expt_um_loss(model_type=model_type, n=n, eps=eps)
+    #                        for eps in [1.25, 2.5, 5.0, 10.0]]
+    #                 for model_type, n in it.product(*params)]
+    # pd.DataFrame(um_loss_data, columns=['n', 1.25, 2.5, 5.0, 10.0]).to_csv(f"value_models_experiments/summary/{params[0][0]}_UM_Loss.csv", index=False)
+
+    # Step 3, compute whether the empirical market clears
+    market_clears = [[n] + [does_market_clear(model_type=model_type, n=n, eps=eps)
+                            for eps in [1.25, 2.5, 5.0, 10.0]]
+                     for model_type, n in it.product(*params)]
+    pd.DataFrame(market_clears, columns=['n', 1.25, 2.5, 5.0, 10.0]).to_csv(f"value_models_experiments/summary/{params[0][0]}_Market_Clears.csv", index=False)
