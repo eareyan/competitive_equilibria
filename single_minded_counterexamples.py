@@ -2,7 +2,7 @@ import pprint
 from random import sample, randint, random
 
 import pulp
-
+import itertools
 
 def generate_random_single_minded_market(num_goods, num_consumers):
     """
@@ -113,6 +113,29 @@ def compute_pricing(market, allocation, debug=False):
         good: goods_vars[good].varValue for good in market["list_of_goods"]
     }
 
+def check_three_structure(market):
+    """
+    Given a counterexample check if the 3x3 substructure exists
+    """
+    set_consumer = set()
+    list_bundles = list()
+    for consumer, (_, bundle) in market["consumers"].items():
+        set_consumer.add(consumer)
+        list_bundles.append(set(bundle))
+
+    for subset in itertools.combinations(set_consumer, 3):
+        c1, c2, c3 = subset
+        bundle1 = list_bundles[c1]
+        bundle2 = list_bundles[c2]
+        bundle3 = list_bundles[c3]
+        
+        int12 = len(bundle1.intersection(bundle2))
+        int23 = len(bundle2.intersection(bundle3))
+        int13 = len(bundle1.intersection(bundle3))
+
+        if int12 and int13 and int23:
+            return True, (c1, c2, c3)
+    return False, (-1, -1, -1)
 
 if __name__ == "__main__":
 
@@ -133,6 +156,7 @@ if __name__ == "__main__":
 
         # Here we can just output examples where the market fails.
         if status == "Infeasible":
+            bool_structure, consumers = check_three_structure(example_market)
             print("**************")
             print("example_market")
             pprint.pprint(example_market)
@@ -141,3 +165,4 @@ if __name__ == "__main__":
             print("example_prices")
             pprint.pprint(example_prices)
             print(status)
+            print(f"the 3x3 structure is present: {bool_structure} with consumers {consumers}")
