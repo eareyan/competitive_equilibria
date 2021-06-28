@@ -147,10 +147,25 @@ if __name__ == "__main__":
 
     for t in range(0, 100):
         print(f"Example #{t}")
+        """
         example_market = generate_random_single_minded_market(
-            num_goods=10, num_consumers=10
+            num_goods=5, num_consumers=5
         )
-
+        """
+        # MG: hardcoding 7x7 market
+        list_of_goods = [j for j in range(7)]
+        example_market = {
+        "list_of_goods": list_of_goods,
+        "consumers": {
+            0: (1, (0, 1)),
+            1: (1, (1, 2)),
+            2: (1, (2, 3)),
+            3: (1, (3, 4)),
+            4: (1, (4, 5)),
+            5: (1, (5, 6)),
+            6: (1, (6, 0)),
+        },
+        }
         example_allocation = compute_welfare_max_allocation(example_market)
         status, example_prices = compute_pricing(example_market, example_allocation)
 
@@ -166,3 +181,6 @@ if __name__ == "__main__":
             pprint.pprint(example_prices)
             print(status)
             print(f"the 3x3 structure is present: {bool_structure} with consumers {consumers}")
+
+        # MG: hardcoding, remove for normal run
+        break
